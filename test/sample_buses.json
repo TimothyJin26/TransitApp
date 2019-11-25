@@ -1,0 +1,30 @@
+[
+  {
+    "VehicleNo": "15015",
+    "TripId": 10631538,
+    "RouteNo": "049",
+    "Direction": "WEST",
+    "Destination": "UBC",
+    "Pattern": "WB1",
+    "Latitude": 49.264817,
+    "Longitude": -123.244083,
+    "RecordedTime": "10:25:36 pm",
+    "RouteMap":{
+      "Href": "https://nb.translink.ca/geodata/049.kmz"
+    }
+  },
+  {
+    "VehicleNo": "16213",
+    "TripId": 10631539,
+    "RouteNo": "049",
+    "Direction": "WEST",
+    "Destination": "UBC",
+    "Pattern": "WB1",
+    "Latitude": 49.225417,
+    "Longitude": -123.087283,
+    "RecordedTime": "10:26:47 pm",
+    "RouteMap":{
+      "Href": "https://nb.translink.ca/geodata/049.kmz"
+    }
+  }
+]
