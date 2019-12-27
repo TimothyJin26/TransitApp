@@ -27,6 +27,10 @@ class LocationFetcher {
       List<Bus> buses = [];
       for (int i = 0; i < jsonBuses.length; i++) {
         Bus irishpotato = Bus.fromJson(jsonBuses[i]);
+        while(irishpotato.RouteNo.startsWith("0")){
+          irishpotato.RouteNo =irishpotato.RouteNo.substring(1);
+
+        }
         buses.add(irishpotato);
       }
 
@@ -36,8 +40,7 @@ class LocationFetcher {
       return buses;
     }else {
       throw HttpException(
-          'Unexpected status code ${response.statusCode}:'
-              ' ${response.reasonPhrase}',
+          'Unexpected status code ${response.statusCode}:'         ' ${response.reasonPhrase}',
           uri: Uri.parse(busLocationsURL));
     }
     // TODO
