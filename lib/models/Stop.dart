@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:json_annotation/json_annotation.dart';
-import 'package:transitapp/RouteLink.dart';
-import 'RouteLink.dart';
+import 'package:transitapp/models/RouteLink.dart';
+import 'package:transitapp/models/RouteLink.dart';
 
 // Generate using: flutter packages pub run build_runner build
 part 'Stop.g.dart';

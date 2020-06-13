@@ -1,8 +1,8 @@
 import 'dart:core';
 
 import "package:test/test.dart";
-import 'package:transitapp/Bus.dart';
-import 'package:transitapp/LocationFetcher.dart';
+import 'package:transitapp/models/Bus.dart';
+import 'package:transitapp/fetchers/LocationFetcher.dart';
 
 void main() {
   test("Get buses at a certain lat/lng", () async {
@@ -58,4 +58,5 @@ void main() {
       print(actualListOfAllBuses[i].RouteNo);
     }
    });
+
 }

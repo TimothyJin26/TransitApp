@@ -17,6 +17,7 @@ environment:
   sdk: ">=2.1.0 <3.0.0"
 
 dependencies:
+  vibrate: ^0.0.4
   location: 2.3.5
   flutter:
     sdk: flutter

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:json_annotation/json_annotation.dart';
 import 'dart:developer';
-import 'Bus.dart';
-import 'Stop.dart';
-import 'StopFetcher.dart';
+import 'package:transitapp/models/Bus.dart';
+import 'package:transitapp/models/Stop.dart';
+import 'package:transitapp/fetchers/StopFetcher.dart';
 
 class LocationFetcher {
 
@@ -13,6 +13,7 @@ class LocationFetcher {
    * Fetches the locations of all active buses
    */
   Future<List<Bus>> fetchAllBuses() async {
+    print('Fetching all buses');
     String busLocationsURL =
         'https://api.translink.ca/rttiapi/v1/buses?apikey=perA9biw6Ipc8aobcMa3';
     Map<String, String> requestHeaders = {
@@ -23,8 +24,10 @@ class LocationFetcher {
     final response = await http.get(busLocationsURL, headers: requestHeaders);
 
     if (response.statusCode == 200) {
+      print("Finished fetching all buses");
       List<dynamic> jsonBuses = (json.decode(response.body) as List);
       List<Bus> buses = [];
+      print("Total buses = " + jsonBuses.length.toString());
       for (int i = 0; i < jsonBuses.length; i++) {
         Bus irishpotato = Bus.fromJson(jsonBuses[i]);
         while(irishpotato.RouteNo.startsWith("0")){
@@ -33,6 +36,7 @@ class LocationFetcher {
         }
         buses.add(irishpotato);
       }
+      print("Finished parsing all buses");
 
       return buses;
     } else if(response.statusCode==404) {
