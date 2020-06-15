@@ -10,6 +10,18 @@ part 'Trip.g.dart';
 
 @JsonSerializable()
 class Trip {
+   String Pattern;
+   String Destination;
+   int ExpectedCountdown;
+   String LastUpdate;
+
+
+ // Trip(String Pattern, String Destination, int ExpectedCount, String LastUpdate){
+//    this.Pattern = Destination;
+//    this.Destination = Pattern;
+//    this.ExpectedCountdown = ExpectedCount;
+//    this.LastUpdate = LastUpdate;
+//  }
   Trip({
     this.Pattern,
     this.Destination,
@@ -26,8 +38,5 @@ class Trip {
   Map<String, dynamic> toJson() => _$TripToJson(this);
 
 
-  final String Pattern;
-  final String Destination;
-  final String ExpectedCountdown;
-  final String LastUpdate;
+
 }

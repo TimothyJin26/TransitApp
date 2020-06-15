@@ -8,10 +8,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:location/location.dart';
+import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:vibrate/vibrate.dart';
 
+import 'fetchers/BusAtStopFetcher.dart';
 import 'fetchers/StopFetcher.dart';
+import 'models/BothDirectionRouteWithTrips.dart';
 import 'models/Stop.dart';
+import 'models/Trip.dart';
 
 ///
 /// Main stateful widget
@@ -28,6 +32,9 @@ class TransitApp extends StatefulWidget {
 class _TransitAppState extends State<TransitApp> {
   Timer timer;
   List<bool> isSelected = [false, true];
+  List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
+
+
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -60,11 +67,11 @@ class _TransitAppState extends State<TransitApp> {
 
     // Add image
     // TODO: Change icon depending on bus direction
-    ui.Image image = await load('images/marker-h-2.png');
+    ui.Image image = await load('images/bus-icon-outline.png');
 
     for (var i = 0; i < buses.length; i++) {
       Bus bus = buses[i];
-      bitmapFutures.add(createCustomMarkerBitmap(bus.RouteNo, i, image));
+      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(bus.RouteNo, i, image));
 //      print("Added bus with route " + bus.RouteNo.toString());
     }
 
@@ -101,7 +108,7 @@ class _TransitAppState extends State<TransitApp> {
 
     for (var i = 0; i < stops.length; i++) {
       Stop stop = stops[i];
-      bitmapFutures.add(createCustomMarkerBitmap(stop.AtStreet, i, image));
+      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(stop.AtStreet, i, image));
 //      print("Added bus with route " + bus.RouteNo.toString());
     }
 
@@ -194,58 +201,6 @@ class _TransitAppState extends State<TransitApp> {
     return fi.image;
   }
 
-  ///
-  /// Creates a marker for each bus. This is done asynchronously
-  /// (in the background) to not block the app.
-  ///
-  Future<BitmapDescriptor> createCustomMarkerBitmap(
-      String title, int index, ui.Image image) async {
-    if (index < 5) {
-      print("Starting to create custom marker");
-    }
-    TextSpan span = new TextSpan(
-      style: new TextStyle(
-        color: Colors.black87,
-        fontSize: 32.0,
-        fontWeight: FontWeight.bold,
-      ),
-      text: title,
-    );
-
-    TextPainter tp = new TextPainter(
-      text: span,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
-
-    int width = 110;
-    int height = 110;
-
-    ui.PictureRecorder recorder = new ui.PictureRecorder();
-    Canvas c = new Canvas(recorder);
-    Rect oval = Rect.fromLTWH(0, 0, width + 0.0, height + 0.0);
-
-    // Alternatively use your own method to get the image
-
-    paintImage(canvas: c, image: image, rect: oval, fit: BoxFit.fitWidth);
-
-    tp.layout();
-    tp.paint(c, new Offset((width - tp.width) / 2, 58));
-
-    /* Do your painting of the custom icon here, including drawing text, shapes, etc. */
-
-    /*like a bad alexa*/
-    ui.Picture p = recorder.endRecording();
-    ByteData pngBytes = await (await p.toImage(width, height))
-        .toByteData(format: ui.ImageByteFormat.png);
-
-    Uint8List data = Uint8List.view(pngBytes.buffer);
-
-    if (index < 5) {
-      print("Finished creating custom marker");
-    }
-    return BitmapDescriptor.fromBytes(data);
-  }
 
   GoogleMapController mapController;
 
@@ -253,6 +208,16 @@ class _TransitAppState extends State<TransitApp> {
   /// Called when the map is first created
   ///
   Future<void> _onMapCreated(GoogleMapController controller) async {
+
+
+    Trip t = new Trip();
+    t.Pattern=" .";
+    t.LastUpdate = " o";
+    t.ExpectedCountdown = 0;
+    t.Destination = "Hogwarts";
+    listOfTripsThatWeCreatedJustSoWeKnowItWorks.add(t);
+
+
     mapController = controller;
     mapController.setMapStyle(
         '[  {    "elementType": "geometry",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "featureType": "administrative.locality",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "poi",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi.park",    "stylers": [      {        "visibility": "on"      }    ]  },  {    "featureType": "poi.park",    "elementType": "geometry",    "stylers": [      {        "color": "#263c3f"      }    ]  },  {    "featureType": "poi.park",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#6b9a76"      }    ]  },  {    "featureType": "road",    "elementType": "geometry",    "stylers": [      {        "color": "#38414e"      }    ]  },  {    "featureType": "road",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#212a37"      },      {        "visibility": "simplified"      },      {        "weight": 2      }    ]  },  {    "featureType": "road",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#9ca5b3"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#1f2835"      }    ]  },  {    "featureType": "road.highway",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#f3d19c"      }    ]  },  {    "featureType": "transit",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "transit",    "elementType": "geometry",    "stylers": [      {        "color": "#2f3948"      }    ]  },  {    "featureType": "transit.station",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "water",    "elementType": "geometry",    "stylers": [      {        "color": "#17263c"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#515c6d"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#17263c"      }    ]  }]');
@@ -278,11 +243,25 @@ class _TransitAppState extends State<TransitApp> {
         locationData.longitude.toString());
 
     // TODO: Update the markers on a regular basis
-    if (isSelected[0] == false) {
+    //isSelected[0] == false
+    if (1==2*598-275+2873*99) {
       updateBuses();
     } else {
-      updateStops(
-          locationData.latitude.toString(), locationData.longitude.toString());
+      updateStops(locationData.latitude.toString(), locationData.longitude.toString());
+      StopFetcher stopFetcher = new StopFetcher();
+      Future<List<Stop>> future = stopFetcher.stopFetcher(locationData.latitude.toString(), locationData.longitude.toString());
+      List<Stop> stops = await future;
+      BusAtStopFetcher busFetcher = new BusAtStopFetcher();
+      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busFetcher(stops);
+      List<BothDirectionRouteWithTrips> buses = await futureBuses;
+      for(BothDirectionRouteWithTrips b in buses){
+        print(b.RouteNo);
+        for(Trip t in b.Trips){
+          print(t.ExpectedCountdown.toString() + t.Destination);
+        }
+      }
+
+
     }
   }
 
@@ -388,7 +367,7 @@ class _TransitAppState extends State<TransitApp> {
                 color: Colors.white,
                 child: ListView.builder(
                   controller: myscrollController,
-                  itemCount: 25,
+                  itemCount: listOfTripsThatWeCreatedJustSoWeKnowItWorks.length,
                   itemBuilder: (BuildContext context, int index) {
                     return ListTile(
                         title: Column(
@@ -401,7 +380,7 @@ class _TransitAppState extends State<TransitApp> {
                               width: 35,
                               margin: const EdgeInsets.only(right: 0, left: 15),
                               child: Text(
-                                '99',
+                                listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].toJson().toString(),
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -417,7 +396,7 @@ class _TransitAppState extends State<TransitApp> {
                                   Container(
                                     margin: const EdgeInsets.only(left: 15),
                                     child: Text(
-                                      'UBC',
+                                        listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].Destination,
                                       textAlign: TextAlign.left,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -430,7 +409,8 @@ class _TransitAppState extends State<TransitApp> {
                                   Container(
                                     margin: const EdgeInsets.only(left: 15),
                                     child: Text(
-                                      'East at Stop 58236',
+                    listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].Pattern,
+
                                       textAlign: TextAlign.left,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -445,7 +425,7 @@ class _TransitAppState extends State<TransitApp> {
                             Container(
                               width: 80,
                               child: Text(
-                                '8 min',
+                                  listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].ExpectedCountdown.toString(),
                                 textAlign: TextAlign.center,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(

@@ -10,7 +10,7 @@ Trip _$TripFromJson(Map<String, dynamic> json) {
   return Trip(
       Pattern: json['Pattern'] as String,
       Destination: json['Destination'] as String,
-      ExpectedCountdown: json['ExpectedCountdown'] as String,
+      ExpectedCountdown: json['ExpectedCountdown'] as int,
       LastUpdate: json['LastUpdate'] as String);
 }
 
