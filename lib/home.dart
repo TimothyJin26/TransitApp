@@ -33,7 +33,7 @@ class _TransitAppState extends State<TransitApp> {
   Timer timer;
   List<bool> isSelected = [false, true];
   List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
-
+  List<Trip> nextBuses = [];
 
 
   void vibrate() async {
@@ -44,7 +44,12 @@ class _TransitAppState extends State<TransitApp> {
   @override
   void initState() {
     super.initState();
-    timer = Timer.periodic(Duration(seconds: 30), (Timer t) => updateBuses());
+    timer = Timer.periodic(Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
+  }
+  void timerIfSelectedHelper(){
+    if(isSelected[0]==true){
+      updateBuses();
+    }
   }
 
   void dispose() {
@@ -83,6 +88,9 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
+          onTap: (){
+            print(bus.RouteMap.toString());
+          },
           markerId: MarkerId(bus.VehicleNo),
           position: LatLng(bus.Latitude, bus.Longitude),
           infoWindow: InfoWindow(
@@ -108,7 +116,7 @@ class _TransitAppState extends State<TransitApp> {
 
     for (var i = 0; i < stops.length; i++) {
       Stop stop = stops[i];
-      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(stop.AtStreet, i, image));
+      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmapNoText(image));
 //      print("Added bus with route " + bus.RouteNo.toString());
     }
 
@@ -120,6 +128,7 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
+
           markerId: MarkerId(stop.StopNo.toString()),
           position: LatLng(stop.Latitude, stop.Longitude),
           infoWindow: InfoWindow(
@@ -193,6 +202,23 @@ class _TransitAppState extends State<TransitApp> {
       }
     });
   }
+  String patternHelper(String s){
+    if(s.startsWith("E")){
+      return "EASTBOUND";
+    } else if(s.startsWith("N")){
+      return "NORTHBOUND";
+    } else if(s.startsWith("W")){
+      return "WESTBOUND";
+    } else if(s.startsWith("S")){
+      return "SOUTHBOUND";
+    }
+  }
+  String removeZeroes(String s){
+    while(s.substring(0,1)=="0"){
+      s=s.substring(1);
+    }
+    return s;
+  }
 
   Future<ui.Image> load(String asset) async {
     ByteData data = await rootBundle.load(asset);
@@ -252,16 +278,14 @@ class _TransitAppState extends State<TransitApp> {
       Future<List<Stop>> future = stopFetcher.stopFetcher(locationData.latitude.toString(), locationData.longitude.toString());
       List<Stop> stops = await future;
       BusAtStopFetcher busFetcher = new BusAtStopFetcher();
-      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busFetcher(stops);
+      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busFetcher(stops, locationData.latitude,locationData.longitude);
       List<BothDirectionRouteWithTrips> buses = await futureBuses;
-      for(BothDirectionRouteWithTrips b in buses){
-        print(b.RouteNo);
-        for(Trip t in b.Trips){
-          print(t.ExpectedCountdown.toString() + t.Destination);
-        }
+      for(BothDirectionRouteWithTrips t in buses){
+
+          t.Trips[0].RouteNo = t.RouteNo;
+          nextBuses.add(t.Trips[0]);
+
       }
-
-
     }
   }
 
@@ -270,17 +294,27 @@ class _TransitAppState extends State<TransitApp> {
   ///
   /// Builds the UI
   ///
+
   @override
   Widget build(BuildContext context) => MaterialApp(
-          home: Scaffold(
+      home: Scaffold(
         body: Stack(children: <Widget>[
           GoogleMap(
+            myLocationEnabled: true,
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
               target: const LatLng(49.2418584, -123.1401792),
               zoom: 14,
             ),
             markers: _markers.values.toSet(),
+            onCameraIdle: (){
+              if(isSelected[0]==false){
+              mapController.getVisibleRegion().then((value) {
+                double lng =  (value.northeast.longitude+value.southwest.longitude)/2;
+                double lat = (value.northeast.latitude+value.southwest.latitude)/2;
+                updateStops(lat.toString(), lng.toString());
+              });}
+            },
           ),
           Positioned(
             top: 35,
@@ -333,7 +367,7 @@ class _TransitAppState extends State<TransitApp> {
                     //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
                   ],
                   onPressed: (int index) {
-                    // Do some work (e.g. check if the tap is valid)
+                    // Do some work (e.g. check sif the tap is valid)
                     vibrate();
                     // Do more work (e.g. respond to the tap)
                     if (index == 0) {
@@ -343,8 +377,8 @@ class _TransitAppState extends State<TransitApp> {
                     }
                     setState(() {
                       for (int buttonIndex = 0;
-                          buttonIndex < isSelected.length;
-                          buttonIndex++) {
+                      buttonIndex < isSelected.length;
+                      buttonIndex++) {
                         if (buttonIndex == index) {
                           isSelected[buttonIndex] = true;
                         } else {
@@ -367,80 +401,80 @@ class _TransitAppState extends State<TransitApp> {
                 color: Colors.white,
                 child: ListView.builder(
                   controller: myscrollController,
-                  itemCount: listOfTripsThatWeCreatedJustSoWeKnowItWorks.length,
+                  itemCount: nextBuses.length,
                   itemBuilder: (BuildContext context, int index) {
                     return ListTile(
                         title: Column(
-                      children: <Widget>[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: <Widget>[
-                            Container(
-                              width: 35,
-                              margin: const EdgeInsets.only(right: 0, left: 15),
-                              child: Text(
-                                listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].toJson().toString(),
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 28,
-                                    height: 1.0,
-                                    color: Colors.black),
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 15),
-                                    child: Text(
-                                        listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].Destination,
-                                      textAlign: TextAlign.left,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 16,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: <Widget>[
+                                Container(
+                                  width: 60,
+                                  margin: const EdgeInsets.only(right: 0, left: 0),
+                                  child: Text(
+                                    removeZeroes(nextBuses[index].RouteNo),
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 28,
                                         height: 1.0,
-                                        color: getColorFromHex('#024D7E'),
+                                        color: Colors.black),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 5),
+                                        child: Text(
+                                          nextBuses[index].Destination,
+                                          textAlign: TextAlign.left,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            height: 1.0,
+                                            color: getColorFromHex('#024D7E'),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 15),
-                                    child: Text(
-                    listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].Pattern,
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 5),
+                                        child: Text(
+                                          patternHelper(nextBuses[index].Pattern),
 
-                                      textAlign: TextAlign.left,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          height: 1.0,
-                                          color: Colors.black),
-                                    ),
+                                          textAlign: TextAlign.left,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 16,
+                                              height: 1.0,
+                                              color: Colors.black),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                                Container(
+                                  width: 80,
+                                  child: Text(
+                                    nextBuses[index].ExpectedCountdown.toString()+" MIN",
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 24,
+                                        height: 1.0,
+                                        color: Colors.black),
+                                  ),
+                                )
+                              ],
                             ),
-                            Container(
-                              width: 80,
-                              child: Text(
-                                  listOfTripsThatWeCreatedJustSoWeKnowItWorks[index].ExpectedCountdown.toString(),
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 24,
-                                    height: 1.0,
-                                    color: Colors.black),
-                              ),
-                            )
+                            Divider(
+                              color: Theme.of(context).primaryColor,
+                            ),
                           ],
-                        ),
-                        Divider(
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ],
-                    ));
+                        ));
                   },
                 ),
               );

@@ -14,6 +14,7 @@ class Trip {
    String Destination;
    int ExpectedCountdown;
    String LastUpdate;
+   String RouteNo;
 
 
  // Trip(String Pattern, String Destination, int ExpectedCount, String LastUpdate){
@@ -27,6 +28,7 @@ class Trip {
     this.Destination,
     this.ExpectedCountdown,
     this.LastUpdate,
+    this.RouteNo,
 
   });
 

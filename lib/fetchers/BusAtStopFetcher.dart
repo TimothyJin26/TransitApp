@@ -10,10 +10,24 @@ import 'package:transitapp/models/Stop.dart';
 
 class BusAtStopFetcher {
 
-  Future<List<BothDirectionRouteWithTrips>> busFetcher(List<Stop> stopList) async {
+  Future<List<BothDirectionRouteWithTrips>> busFetcher(List<Stop> stopList, double Lat, double Lng) async {
     List<BothDirectionRouteWithTrips> routeTrips = new List<BothDirectionRouteWithTrips>();
+    List<Stop> shortestDistance = new List<Stop>();
+    for(Stop s in stopList){
+      if(shortestDistance.length<4){
+        shortestDistance.add(s);
+      } else{
+        for(Stop stop in shortestDistance){
+          if((Lat+Lng-s.Latitude-s.Longitude).abs()<(Lat+Lng-stop.Longitude-stop.Latitude).abs()){
+            shortestDistance.remove(stop);
+            shortestDistance.add(s);
+          }
+        }
+      }
 
-    for(Stop stop in stopList){
+    }
+    for(Stop stop in shortestDistance){
+      print(stop.Latitude);
       String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/'+ stop.StopNo.toString() +'/estimates?apikey=perA9biw6Ipc8aobcMa3';
       Map<String, String> requestHeaders = {
         'Accept': 'application/json',
@@ -22,6 +36,7 @@ class BusAtStopFetcher {
       final response = await http.get(stopLocationsURL, headers: requestHeaders);
 
       if (response.statusCode == 200) {
+        print(stop.toJson().toString());
         List<dynamic> jsonStops = (json.decode(response.body) as List);
 //        List<RouteID> routeIDs = [];
 

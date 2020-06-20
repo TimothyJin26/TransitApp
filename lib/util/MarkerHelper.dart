@@ -9,9 +9,39 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MarkerHelper {
 
+
+
+  static Future<BitmapDescriptor> createCustomMarkerBitmapNoText(ui.Image image) async {
+
+    int width = 75;
+    int height = 75;
+
+    ui.PictureRecorder recorder = new ui.PictureRecorder();
+    Canvas c = new Canvas(recorder);
+    Rect oval = Rect.fromLTWH(0, 0, width + 0.0, height + 0.0);
+
+    // Alternatively use your own method to get the image
+
+    paintImage(canvas: c, image: image, rect: oval, fit: BoxFit.fitWidth);
+
+
+    /* Do your painting of the custom icon here, including drawing text, shapes, etc. */
+
+    /*like a bad alexa*/
+    ui.Picture p = recorder.endRecording();
+    ByteData pngBytes = await (await p.toImage(width, height))
+        .toByteData(format: ui.ImageByteFormat.png);
+
+    Uint8List data = Uint8List.view(pngBytes.buffer);
+
+
+    return BitmapDescriptor.fromBytes(data);
+  }
+
   ///
   /// Creates a marker for each bus. This is done asynchronously
   /// (in the background) to not block the app.
+  ///
   ///
   static Future<BitmapDescriptor> createCustomMarkerBitmap(
       String title, int index, ui.Image image) async {

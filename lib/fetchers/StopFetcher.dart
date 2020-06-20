@@ -15,7 +15,7 @@ class StopFetcher {
     String longitude1 = double.parse(longitude).toStringAsFixed(6);
 
     String stopLocationsURL =
-        'https://api.translink.ca/rttiapi/v1/stops?apikey=i9U837R3QcSl2OhZpJm0&lat='+latitude1.toString()+'&long='+longitude1;
+        'https://api.translink.ca/rttiapi/v1/stops?apikey=i9U837R3QcSl2OhZpJm0&lat='+latitude1.toString()+'&long='+longitude1+"&radius=500";
     Map<String, String> requestHeaders = {
       'Accept': 'application/json',
     };

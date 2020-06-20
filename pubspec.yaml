@@ -17,6 +17,7 @@ environment:
   sdk: ">=2.1.0 <3.0.0"
 
 dependencies:
+  geolocator: ^5.3.2+2
   vibrate: ^0.0.4
   location: 2.3.5
   flutter:
