@@ -12,6 +12,7 @@ import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:vibrate/vibrate.dart';
 
 import 'fetchers/BusAtStopFetcher.dart';
+import 'fetchers/RouteMapCoordinateHelper.dart';
 import 'fetchers/StopFetcher.dart';
 import 'models/BothDirectionRouteWithTrips.dart';
 import 'models/Stop.dart';
@@ -30,11 +31,11 @@ class TransitApp extends StatefulWidget {
 /// The widget is rendered based on the state defined here
 ///
 class _TransitAppState extends State<TransitApp> {
+  Map<PolylineId, Polyline> _mapPolylines = {};
   Timer timer;
   List<bool> isSelected = [false, true];
   List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
   List<Trip> nextBuses = [];
-
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -44,10 +45,12 @@ class _TransitAppState extends State<TransitApp> {
   @override
   void initState() {
     super.initState();
-    timer = Timer.periodic(Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
+    timer = Timer.periodic(
+        Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
   }
-  void timerIfSelectedHelper(){
-    if(isSelected[0]==true){
+
+  void timerIfSelectedHelper() {
+    if (isSelected[0] == true) {
       updateBuses();
     }
   }
@@ -66,6 +69,7 @@ class _TransitAppState extends State<TransitApp> {
   ///
   /// Get a list of bus markers that can be used to plot on the map
   ///
+
   Future<List<Marker>> getBusList(List<Bus> buses) async {
     List<Marker> l = new List();
     List<Future<BitmapDescriptor>> bitmapFutures = new List();
@@ -76,7 +80,8 @@ class _TransitAppState extends State<TransitApp> {
 
     for (var i = 0; i < buses.length; i++) {
       Bus bus = buses[i];
-      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(bus.RouteNo, i, image));
+      bitmapFutures
+          .add(MarkerHelper.createCustomMarkerBitmap(bus.RouteNo, i, image));
 //      print("Added bus with route " + bus.RouteNo.toString());
     }
 
@@ -87,9 +92,12 @@ class _TransitAppState extends State<TransitApp> {
       BitmapDescriptor bitmapDescriptor = futures[i];
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
+
       final marker = Marker(
-          onTap: (){
-            print(bus.RouteMap.toString());
+          onTap: () {
+            RouteMapCoordinateHelper r = new RouteMapCoordinateHelper();
+            Future<List<LatLng>> route = r.getLatLng(bus.RouteMap.Href);
+            route.then((value) => addLines(bus.RouteNo, value));
           },
           markerId: MarkerId(bus.VehicleNo),
           position: LatLng(bus.Latitude, bus.Longitude),
@@ -102,6 +110,27 @@ class _TransitAppState extends State<TransitApp> {
     }
     print("Got markers list");
     return l;
+  }
+
+  void addLines(String routeNum, List<LatLng> listofLatLng) {
+    setState(() {
+      _mapPolylines.clear();
+
+    });
+    final String polylineIdVal = routeNum;
+    final PolylineId polylineId = PolylineId(polylineIdVal);
+
+    final Polyline polyline = Polyline(
+      polylineId: polylineId,
+      consumeTapEvents: true,
+      color: Colors.teal,
+      width: 5,
+      points: listofLatLng,
+    );
+
+    setState(() {
+      _mapPolylines[polylineId] = polyline;
+    });
   }
 
   ///
@@ -128,7 +157,6 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
-
           markerId: MarkerId(stop.StopNo.toString()),
           position: LatLng(stop.Latitude, stop.Longitude),
           infoWindow: InfoWindow(
@@ -202,20 +230,22 @@ class _TransitAppState extends State<TransitApp> {
       }
     });
   }
-  String patternHelper(String s){
-    if(s.startsWith("E")){
+
+  String patternHelper(String s) {
+    if (s.startsWith("E")) {
       return "EASTBOUND";
-    } else if(s.startsWith("N")){
+    } else if (s.startsWith("N")) {
       return "NORTHBOUND";
-    } else if(s.startsWith("W")){
+    } else if (s.startsWith("W")) {
       return "WESTBOUND";
-    } else if(s.startsWith("S")){
+    } else if (s.startsWith("S")) {
       return "SOUTHBOUND";
     }
   }
-  String removeZeroes(String s){
-    while(s.substring(0,1)=="0"){
-      s=s.substring(1);
+
+  String removeZeroes(String s) {
+    while (s.substring(0, 1) == "0") {
+      s = s.substring(1);
     }
     return s;
   }
@@ -227,22 +257,18 @@ class _TransitAppState extends State<TransitApp> {
     return fi.image;
   }
 
-
   GoogleMapController mapController;
 
   ///
   /// Called when the map is first created
   ///
   Future<void> _onMapCreated(GoogleMapController controller) async {
-
-
     Trip t = new Trip();
-    t.Pattern=" .";
+    t.Pattern = " .";
     t.LastUpdate = " o";
     t.ExpectedCountdown = 0;
     t.Destination = "Hogwarts";
     listOfTripsThatWeCreatedJustSoWeKnowItWorks.add(t);
-
 
     mapController = controller;
     mapController.setMapStyle(
@@ -270,21 +296,22 @@ class _TransitAppState extends State<TransitApp> {
 
     // TODO: Update the markers on a regular basis
     //isSelected[0] == false
-    if (1==2*598-275+2873*99) {
+    if (1 == 2 * 598 - 275 + 2873 * 99) {
       updateBuses();
     } else {
-      updateStops(locationData.latitude.toString(), locationData.longitude.toString());
+      updateStops(
+          locationData.latitude.toString(), locationData.longitude.toString());
       StopFetcher stopFetcher = new StopFetcher();
-      Future<List<Stop>> future = stopFetcher.stopFetcher(locationData.latitude.toString(), locationData.longitude.toString());
+      Future<List<Stop>> future = stopFetcher.stopFetcher(
+          locationData.latitude.toString(), locationData.longitude.toString());
       List<Stop> stops = await future;
       BusAtStopFetcher busFetcher = new BusAtStopFetcher();
-      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busFetcher(stops, locationData.latitude,locationData.longitude);
+      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
+          .busFetcher(stops, locationData.latitude, locationData.longitude);
       List<BothDirectionRouteWithTrips> buses = await futureBuses;
-      for(BothDirectionRouteWithTrips t in buses){
-
-          t.Trips[0].RouteNo = t.RouteNo;
-          nextBuses.add(t.Trips[0]);
-
+      for (BothDirectionRouteWithTrips t in buses) {
+        t.Trips[0].RouteNo = t.RouteNo;
+        nextBuses.add(t.Trips[0]);
       }
     }
   }
@@ -297,7 +324,7 @@ class _TransitAppState extends State<TransitApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-      home: Scaffold(
+          home: Scaffold(
         body: Stack(children: <Widget>[
           GoogleMap(
             myLocationEnabled: true,
@@ -306,14 +333,25 @@ class _TransitAppState extends State<TransitApp> {
               target: const LatLng(49.2418584, -123.1401792),
               zoom: 14,
             ),
+            polylines: Set<Polyline>.of(_mapPolylines.values),
             markers: _markers.values.toSet(),
-            onCameraIdle: (){
-              if(isSelected[0]==false){
-              mapController.getVisibleRegion().then((value) {
-                double lng =  (value.northeast.longitude+value.southwest.longitude)/2;
-                double lat = (value.northeast.latitude+value.southwest.latitude)/2;
-                updateStops(lat.toString(), lng.toString());
-              });}
+            onTap: (LatLng a){
+              var abasdf = a;
+              setState(() {
+                _mapPolylines.clear();
+              });
+            },
+            onCameraIdle: () {
+              if (isSelected[0] == false) {
+                mapController.getVisibleRegion().then((value) {
+                  double lng =
+                      (value.northeast.longitude + value.southwest.longitude) /
+                          2;
+                  double lat =
+                      (value.northeast.latitude + value.southwest.latitude) / 2;
+                  updateStops(lat.toString(), lng.toString());
+                });
+              }
             },
           ),
           Positioned(
@@ -377,8 +415,8 @@ class _TransitAppState extends State<TransitApp> {
                     }
                     setState(() {
                       for (int buttonIndex = 0;
-                      buttonIndex < isSelected.length;
-                      buttonIndex++) {
+                          buttonIndex < isSelected.length;
+                          buttonIndex++) {
                         if (buttonIndex == index) {
                           isSelected[buttonIndex] = true;
                         } else {
@@ -405,76 +443,76 @@ class _TransitAppState extends State<TransitApp> {
                   itemBuilder: (BuildContext context, int index) {
                     return ListTile(
                         title: Column(
+                      children: <Widget>[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: <Widget>[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: <Widget>[
-                                Container(
-                                  width: 60,
-                                  margin: const EdgeInsets.only(right: 0, left: 0),
-                                  child: Text(
-                                    removeZeroes(nextBuses[index].RouteNo),
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontSize: 28,
-                                        height: 1.0,
-                                        color: Colors.black),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 5),
-                                        child: Text(
-                                          nextBuses[index].Destination,
-                                          textAlign: TextAlign.left,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            height: 1.0,
-                                            color: getColorFromHex('#024D7E'),
-                                          ),
-                                        ),
-                                      ),
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 5),
-                                        child: Text(
-                                          patternHelper(nextBuses[index].Pattern),
-
-                                          textAlign: TextAlign.left,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 16,
-                                              height: 1.0,
-                                              color: Colors.black),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Container(
-                                  width: 80,
-                                  child: Text(
-                                    nextBuses[index].ExpectedCountdown.toString()+" MIN",
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontSize: 24,
-                                        height: 1.0,
-                                        color: Colors.black),
-                                  ),
-                                )
-                              ],
+                            Container(
+                              width: 60,
+                              margin: const EdgeInsets.only(right: 0, left: 0),
+                              child: Text(
+                                removeZeroes(nextBuses[index].RouteNo),
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 28,
+                                    height: 1.0,
+                                    color: Colors.black),
+                              ),
                             ),
-                            Divider(
-                              color: Theme.of(context).primaryColor,
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: <Widget>[
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 5),
+                                    child: Text(
+                                      nextBuses[index].Destination,
+                                      textAlign: TextAlign.left,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        height: 1.0,
+                                        color: getColorFromHex('#024D7E'),
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.only(left: 5),
+                                    child: Text(
+                                      patternHelper(nextBuses[index].Pattern),
+                                      textAlign: TextAlign.left,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 15,
+                                          height: 1.0,
+                                          color: Colors.black),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
+                            Container(
+                              width: 80,
+                              child: Text(
+                                nextBuses[index].ExpectedCountdown.toString() +
+                                    " min",
+                                textAlign: TextAlign.center,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 22,
+                                    height: 1.0,
+                                    color: Colors.black),
+                              ),
+                            )
                           ],
-                        ));
+                        ),
+                        Divider(
+                          color: Theme.of(context).primaryColor,
+                        ),
+                      ],
+                    ));
                   },
                 ),
               );
