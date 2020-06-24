@@ -7,6 +7,7 @@ import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
+import 'package:transitapp/models/Trip.dart';
 
 class BusAtStopFetcher {
 
@@ -42,6 +43,10 @@ class BusAtStopFetcher {
 
         for (int i = 0; i < jsonStops.length; i++) {
           SingleDirectionRouteWithTrips irishplenty = SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
+          for(Trip t in irishplenty.Schedules){
+            t.nextStop = stop.AtStreet+" and \n"+stop.OnStreet;
+          }
+
           List<String> list = new List<String>();
           for(BothDirectionRouteWithTrips routeTrip in routeTrips){
             list.add(routeTrip.RouteNo);

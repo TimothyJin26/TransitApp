@@ -95,29 +95,36 @@ class _TransitAppState extends State<TransitApp> {
 
       final marker = Marker(
           onTap: () {
+            setState(() {
+              _mapPolylines.clear();
+            });
             RouteMapCoordinateHelper r = new RouteMapCoordinateHelper();
-            Future<List<LatLng>> route = r.getLatLng(bus.RouteMap.Href);
-            route.then((value) => addLines(bus.RouteNo, value));
+            Future<List<List<LatLng>>> route = r.getLatLng(bus.RouteMap.Href);
+
+            route.then((List<List<LatLng>> value) {
+              int index = 0;
+              for(List<LatLng> list in value){
+                addLines(bus.RouteNo, list, index);
+                index++;
+              }
+            });
           },
-          markerId: MarkerId(bus.VehicleNo),
+          markerId:  MarkerId(bus.VehicleNo),
           position: LatLng(bus.Latitude, bus.Longitude),
           infoWindow: InfoWindow(
             title: bus.RouteNo,
             snippet: bus.Pattern,
           ),
           icon: bitmapDescriptor);
-      l.add(marker);
+      l.add(marker
+      );
     }
     print("Got markers list");
     return l;
   }
 
-  void addLines(String routeNum, List<LatLng> listofLatLng) {
-    setState(() {
-      _mapPolylines.clear();
-
-    });
-    final String polylineIdVal = routeNum;
+  void addLines(String routeNum, List<LatLng> listofLatLng, int index) {
+    final String polylineIdVal = index.toString();
     final PolylineId polylineId = PolylineId(polylineIdVal);
 
     final Polyline polyline = Polyline(
@@ -252,7 +259,8 @@ class _TransitAppState extends State<TransitApp> {
 
   Future<ui.Image> load(String asset) async {
     ByteData data = await rootBundle.load(asset);
-    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
+    ui.Codec codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List());
     ui.FrameInfo fi = await codec.getNextFrame();
     return fi.image;
   }
@@ -300,10 +308,12 @@ class _TransitAppState extends State<TransitApp> {
       updateBuses();
     } else {
       updateStops(
-          locationData.latitude.toString(), locationData.longitude.toString());
+          locationData.latitude.toString(),
+          locationData.longitude.toString());
       StopFetcher stopFetcher = new StopFetcher();
       Future<List<Stop>> future = stopFetcher.stopFetcher(
-          locationData.latitude.toString(), locationData.longitude.toString());
+          locationData.latitude.toString(),
+          locationData.longitude.toString());
       List<Stop> stops = await future;
       BusAtStopFetcher busFetcher = new BusAtStopFetcher();
       Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
@@ -323,203 +333,220 @@ class _TransitAppState extends State<TransitApp> {
   ///
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) =>
+      MaterialApp(
           home: Scaffold(
-        body: Stack(children: <Widget>[
-          GoogleMap(
-            myLocationEnabled: true,
-            onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(
-              target: const LatLng(49.2418584, -123.1401792),
-              zoom: 14,
-            ),
-            polylines: Set<Polyline>.of(_mapPolylines.values),
-            markers: _markers.values.toSet(),
-            onTap: (LatLng a){
-              var abasdf = a;
-              setState(() {
-                _mapPolylines.clear();
-              });
-            },
-            onCameraIdle: () {
-              if (isSelected[0] == false) {
-                mapController.getVisibleRegion().then((value) {
-                  double lng =
-                      (value.northeast.longitude + value.southwest.longitude) /
-                          2;
-                  double lat =
-                      (value.northeast.latitude + value.southwest.latitude) / 2;
-                  updateStops(lat.toString(), lng.toString());
-                });
-              }
-            },
-          ),
-          Positioned(
-            top: 35,
-            right: 15,
-            left: 15,
-            child: Container(
-              color: Colors.white,
-              child: Row(
-                children: <Widget>[
-                  IconButton(
-                    splashColor: Colors.grey,
-                    icon: Icon(Icons.menu),
-                    onPressed: () {},
-                  ),
-                  Expanded(
-                    child: TextField(
-                      cursorColor: Colors.black,
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.go,
-                      decoration: InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 15),
-                          hintText: "Search..."),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            top: 100,
-            right: 15,
-            left: 15,
-            child: Align(
-              alignment: Alignment.topRight,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border.all(color: Colors.black, width: 1.0),
-                  borderRadius: BorderRadius.all(Radius.circular(10)),
+            body: Stack(children: <Widget>[
+              GoogleMap(
+                myLocationEnabled: true,
+                onMapCreated: _onMapCreated,
+                initialCameraPosition: CameraPosition(
+                  target: const LatLng(49.2418584, -123.1401792),
+                  zoom: 14,
                 ),
-                child: ToggleButtons(
-                  fillColor: Colors.white,
-                  disabledColor: Colors.red,
-                  borderRadius: BorderRadius.circular(10),
-                  children: <Widget>[
-                    Icon(Icons.directions_bus),
-                    Icon(Icons.pin_drop),
+                polylines: Set<Polyline>.of(_mapPolylines.values),
+                markers: _markers.values.toSet(),
+                onTap: (LatLng a) {
+                  var abasdf = a;
+                  setState(() {
+                    _mapPolylines.clear();
+                  });
+                },
+                onCameraIdle: () {
+                  if (isSelected[0] == false) {
+                    mapController.getVisibleRegion().then((value) {
+                      double lng =
+                          (value.northeast.longitude +
+                              value.southwest.longitude) /
+                              2;
+                      double lat =
+                          (value.northeast.latitude +
+                              value.southwest.latitude) / 2;
+                      updateStops(lat.toString(), lng.toString());
+                    });
+                  }
+                },
+              ),
+              Positioned(
+                top: 35,
+                right: 15,
+                left: 15,
+                child: Container(
+                  color: Colors.white,
+                  child: Row(
+                    children: <Widget>[
+                      IconButton(
+                        splashColor: Colors.grey,
+                        icon: Icon(Icons.menu),
+                        onPressed: () {},
+                      ),
+                      Expanded(
+                        child: TextField(
+                          cursorColor: Colors.black,
+                          keyboardType: TextInputType.text,
+                          textInputAction: TextInputAction.go,
+                          decoration: InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 15),
+                              hintText: "Search..."),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 100,
+                right: 15,
+                left: 15,
+                child: Align(
+                  alignment: Alignment.topRight,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: Colors.black, width: 1.0),
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
+                    child: ToggleButtons(
+                      fillColor: Colors.white,
+                      disabledColor: Colors.red,
+                      borderRadius: BorderRadius.circular(10),
+                      children: <Widget>[
+                        Icon(Icons.directions_bus),
+                        Icon(Icons.pin_drop),
 
-                    //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
-                  ],
-                  onPressed: (int index) {
-                    // Do some work (e.g. check sif the tap is valid)
-                    vibrate();
-                    // Do more work (e.g. respond to the tap)
-                    if (index == 0) {
-                      updateBuses();
-                    } else {
-                      getLocationAndUpdateStops();
-                    }
-                    setState(() {
-                      for (int buttonIndex = 0;
+                        //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
+                      ],
+                      onPressed: (int index) {
+                        // Do some work (e.g. check sif the tap is valid)
+                        vibrate();
+                        // Do more work (e.g. respond to the tap)
+                        if (index == 0) {
+                          updateBuses();
+                        } else {
+                          getLocationAndUpdateStops();
+                        }
+                        setState(() {
+                          for (int buttonIndex = 0;
                           buttonIndex < isSelected.length;
                           buttonIndex++) {
-                        if (buttonIndex == index) {
-                          isSelected[buttonIndex] = true;
-                        } else {
-                          isSelected[buttonIndex] = false;
-                        }
-                      }
-                    });
-                  },
-                  isSelected: isSelected,
+                            if (buttonIndex == index) {
+                              isSelected[buttonIndex] = true;
+                            } else {
+                              isSelected[buttonIndex] = false;
+                            }
+                          }
+                        });
+                      },
+                      isSelected: isSelected,
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-          DraggableScrollableSheet(
-            initialChildSize: 0.3,
-            minChildSize: 0.1,
-            maxChildSize: 0.8,
-            builder: (BuildContext context, myscrollController) {
-              return Container(
-                color: Colors.white,
-                child: ListView.builder(
-                  controller: myscrollController,
-                  itemCount: nextBuses.length,
-                  itemBuilder: (BuildContext context, int index) {
-                    return ListTile(
-                        title: Column(
-                      children: <Widget>[
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: <Widget>[
-                            Container(
-                              width: 60,
-                              margin: const EdgeInsets.only(right: 0, left: 0),
-                              child: Text(
-                                removeZeroes(nextBuses[index].RouteNo),
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 28,
-                                    height: 1.0,
-                                    color: Colors.black),
-                              ),
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 5),
-                                    child: Text(
-                                      nextBuses[index].Destination,
-                                      textAlign: TextAlign.left,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        height: 1.0,
-                                        color: getColorFromHex('#024D7E'),
+              DraggableScrollableSheet(
+                initialChildSize: 0.3,
+                minChildSize: 0.1,
+                maxChildSize: 0.8,
+                builder: (BuildContext context, myscrollController) {
+                  return Container(
+                    color: Colors.white,
+                    child: ListView.builder(
+                      controller: myscrollController,
+                      itemCount: nextBuses.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        return ListTile(
+                            title: Column(
+                              children: <Widget>[
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment
+                                      .start,
+                                  mainAxisAlignment: MainAxisAlignment
+                                      .spaceBetween,
+                                  children: <Widget>[
+                                    Container(
+                                      width: 60,
+                                      margin: const EdgeInsets.only(
+                                          right: 0, left: 0),
+                                      child: Text(
+                                        removeZeroes(
+                                            nextBuses[index].RouteNo),
+                                        textAlign: TextAlign.center,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 28,
+                                            height: 1.0,
+                                            color: Colors.black),
                                       ),
                                     ),
-                                  ),
-                                  Container(
-                                    margin: const EdgeInsets.only(left: 5),
-                                    child: Text(
-                                      patternHelper(nextBuses[index].Pattern),
-                                      textAlign: TextAlign.left,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                          fontSize: 15,
-                                          height: 1.0,
-                                          color: Colors.black),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment
+                                            .start,
+                                        children: <Widget>[
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                                left: 5),
+                                            child: Text(
+                                              nextBuses[index].Destination,
+                                              textAlign: TextAlign.left,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.w600,
+                                                height: 1.0,
+                                                color: getColorFromHex(
+                                                    '#024D7E'),
+                                              ),
+                                            ),
+                                          ),
+                                          Container(
+                                            margin: const EdgeInsets.only(
+                                                left: 5),
+                                            child: Text(
+                                              patternHelper(nextBuses[index].Pattern)+" at \n"+nextBuses[index].nextStop.toString(),
+                                              textAlign: TextAlign.left,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                  fontSize: 15,
+                                                  height: 1.0,
+                                                  fontWeight: FontWeight.w400,
+                                                  color: Colors.deepOrange),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 80,
-                              child: Text(
-                                nextBuses[index].ExpectedCountdown.toString() +
-                                    " min",
-                                textAlign: TextAlign.center,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 22,
-                                    height: 1.0,
-                                    color: Colors.black),
-                              ),
-                            )
-                          ],
-                        ),
-                        Divider(
-                          color: Theme.of(context).primaryColor,
-                        ),
-                      ],
-                    ));
-                  },
-                ),
-              );
-            },
-          ),
-        ]),
-      ));
+                                    Container(
+                                      width: 70,
+                                      child: Text(
+                                        nextBuses[index].ExpectedCountdown
+                                            .toString() +
+                                            " min",
+                                        textAlign: TextAlign.center,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            fontSize: 22,
+                                            height: 1.0,
+                                            color: Colors.black),
+                                      ),
+                                    )
+                                  ],
+                                ),
+                                Divider(
+                                  color: Theme
+                                      .of(context)
+                                      .primaryColor,
+                                ),
+                              ],
+                            ));
+                      },
+                    ),
+                  );
+                },
+              ),
+            ]),
+          ));
 }
 
 ///

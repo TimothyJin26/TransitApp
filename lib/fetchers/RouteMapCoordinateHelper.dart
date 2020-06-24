@@ -8,8 +8,9 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 class RouteMapCoordinateHelper {
   String url;
 
-  Future<List<LatLng>> getLatLng(String url) async {
+  Future<List<List<LatLng>>> getLatLng(String url) async {
     List<LatLng> toRet = [];
+    List<List<LatLng>> finalToRet = [];
     this.url = url;
     final response = await http.get(url);
     if (response.statusCode == 200) {
@@ -33,15 +34,16 @@ class RouteMapCoordinateHelper {
             var stringList = e.text.split("0.0 ");
             for(String s in stringList){
               var list = s.split(",");
-              var kat = list[1];
-              var lng = list[0];
-              print(double.parse(list[0].substring(1,10)).toString()+"           ASDFGHJNBVCDSERTYUJKMNBVCXDFGHJMNB VCXDFGHJKMN BVCXSDFGTHJKM NBVCXDFRTGYHJMNB VCDFRTYHJNB VCXDFRTYUKMN BVCFRTYUKMNBVFGHJ POTATO");
               toRet.add(new LatLng(double.parse(list[1]), double.parse(list[0])));
             }
+            finalToRet.add(toRet);
+            toRet = [];
           }
         }
+
       }
     }
-    return toRet;
+    print(finalToRet.length);
+    return finalToRet;
   }
 }

@@ -10,6 +10,7 @@ part 'Trip.g.dart';
 
 @JsonSerializable()
 class Trip {
+   String nextStop;
    String Pattern;
    String Destination;
    int ExpectedCountdown;
