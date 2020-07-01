@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:location/location.dart';
@@ -33,9 +34,12 @@ class TransitApp extends StatefulWidget {
 class _TransitAppState extends State<TransitApp> {
   Map<PolylineId, Polyline> _mapPolylines = {};
   Timer timer;
-  List<bool> isSelected = [false, true];
+  Timer timerShort;
+  List<bool> isSelected = [true, false];
   List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
   List<Trip> nextBuses = [];
+
+  bool zoomBool = false;
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -47,6 +51,26 @@ class _TransitAppState extends State<TransitApp> {
     super.initState();
     timer = Timer.periodic(
         Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
+    timerShort = Timer.periodic(
+        Duration(seconds: 2), (Timer t) => timerIfSelectedHelperShort());
+  }
+
+  void timerIfSelectedHelperShort() {
+    if (isSelected[0] == true)
+      setState(() {
+        for (String key in _markers.keys) {
+          final marker = Marker(
+              onTap: _markers[key].onTap,
+              markerId: _markers[key].markerId,
+              position: LatLng(_markers[key].position.latitude + 0.1,
+                  _markers[key].position.longitude + 0.1),
+              infoWindow: _markers[key].infoWindow,
+              icon: _markers[key].icon);
+          _markers[key] = marker;
+          print("66");
+          //The Great Migration
+        }
+      });
   }
 
   void timerIfSelectedHelper() {
@@ -57,13 +81,14 @@ class _TransitAppState extends State<TransitApp> {
 
   void dispose() {
     timer?.cancel();
+    timerShort?.cancel();
     super.dispose();
   }
 
-  // Markers of buses to display on the home screen (vehicle ID to marker)
+// Markers of buses to display on the home screen (vehicle ID to marker)
   final Map<String, Marker> _markers = {};
 
-  // Color of the marker
+// Color of the marker
   final String colorOfMarker = "blue";
 
   ///
@@ -103,21 +128,20 @@ class _TransitAppState extends State<TransitApp> {
 
             route.then((List<List<LatLng>> value) {
               int index = 0;
-              for(List<LatLng> list in value){
+              for (List<LatLng> list in value) {
                 addLines(bus.RouteNo, list, index);
                 index++;
               }
             });
           },
-          markerId:  MarkerId(bus.VehicleNo),
+          markerId: MarkerId(bus.VehicleNo),
           position: LatLng(bus.Latitude, bus.Longitude),
           infoWindow: InfoWindow(
             title: bus.RouteNo,
             snippet: bus.Pattern,
           ),
           icon: bitmapDescriptor);
-      l.add(marker
-      );
+      l.add(marker);
     }
     print("Got markers list");
     return l;
@@ -140,6 +164,9 @@ class _TransitAppState extends State<TransitApp> {
     });
   }
 
+  ///MightyFamine
+  void updateScrollableStopListOnTap() {}
+
   ///
   /// Get a list of stop markers that can be used to plot on the map
   ///
@@ -155,6 +182,7 @@ class _TransitAppState extends State<TransitApp> {
       bitmapFutures.add(MarkerHelper.createCustomMarkerBitmapNoText(image));
 //      print("Added bus with route " + bus.RouteNo.toString());
     }
+    print("Got markers list");
 
     List<BitmapDescriptor> futures = await Future.wait(bitmapFutures);
     for (var i = 0; i < stops.length; i++) {
@@ -164,6 +192,24 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
+          onTap: () {
+            setState(() {
+              BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
+              Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
+                  .busAtSingleStopFetcher(stop, stop.StopNo.toString());
+              futureBuses.then((List<BothDirectionRouteWithTrips> value) {
+                List<BothDirectionRouteWithTrips> buses = value;
+                for (BothDirectionRouteWithTrips t in value) {
+                  int count = 0;
+                  for (Trip trip in t.Trips) {
+                    trip.RouteNo = t.RouteNo;
+                    nextBuses.add(trip);
+                    count++;
+                  }
+                }
+              });
+            });
+          },
           markerId: MarkerId(stop.StopNo.toString()),
           position: LatLng(stop.Latitude, stop.Longitude),
           infoWindow: InfoWindow(
@@ -173,7 +219,6 @@ class _TransitAppState extends State<TransitApp> {
           icon: bitmapDescriptor);
       l.add(marker);
     }
-    print("Got markers list");
     return l;
   }
 
@@ -193,8 +238,10 @@ class _TransitAppState extends State<TransitApp> {
     // Sets the state to update the markers on the map
     setState(() {
       _markers.clear();
+      print("230");
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
+        print("236");
       }
     });
   }
@@ -214,7 +261,9 @@ class _TransitAppState extends State<TransitApp> {
       }
     }
     updateStops(
-        locationData.latitude.toString(), locationData.longitude.toString());
+        //358
+        locationData.latitude.toString(),
+        locationData.longitude.toString());
   }
 
   ///
@@ -232,8 +281,10 @@ class _TransitAppState extends State<TransitApp> {
     // Sets the state to update the markers on the map
     setState(() {
       _markers.clear();
+      print("274");
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
+        print("277");
       }
     });
   }
@@ -259,8 +310,7 @@ class _TransitAppState extends State<TransitApp> {
 
   Future<ui.Image> load(String asset) async {
     ByteData data = await rootBundle.load(asset);
-    ui.Codec codec = await ui.instantiateImageCodec(
-        data.buffer.asUint8List());
+    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List());
     ui.FrameInfo fi = await codec.getNextFrame();
     return fi.image;
   }
@@ -304,16 +354,14 @@ class _TransitAppState extends State<TransitApp> {
 
     // TODO: Update the markers on a regular basis
     //isSelected[0] == false
-    if (1 == 2 * 598 - 275 + 2873 * 99) {
+    if (isSelected[0] == false) {
       updateBuses();
     } else {
       updateStops(
-          locationData.latitude.toString(),
-          locationData.longitude.toString());
+          locationData.latitude.toString(), locationData.longitude.toString());
       StopFetcher stopFetcher = new StopFetcher();
       Future<List<Stop>> future = stopFetcher.stopFetcher(
-          locationData.latitude.toString(),
-          locationData.longitude.toString());
+          locationData.latitude.toString(), locationData.longitude.toString());
       List<Stop> stops = await future;
       BusAtStopFetcher busFetcher = new BusAtStopFetcher();
       Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
@@ -333,220 +381,258 @@ class _TransitAppState extends State<TransitApp> {
   ///
 
   @override
-  Widget build(BuildContext context) =>
-      MaterialApp(
+  Widget build(BuildContext context) => MaterialApp(
           home: Scaffold(
-            body: Stack(children: <Widget>[
-              GoogleMap(
-                myLocationEnabled: true,
-                onMapCreated: _onMapCreated,
-                initialCameraPosition: CameraPosition(
-                  target: const LatLng(49.2418584, -123.1401792),
-                  zoom: 14,
-                ),
-                polylines: Set<Polyline>.of(_mapPolylines.values),
-                markers: _markers.values.toSet(),
-                onTap: (LatLng a) {
-                  var abasdf = a;
-                  setState(() {
-                    _mapPolylines.clear();
-                  });
-                },
-                onCameraIdle: () {
-                  if (isSelected[0] == false) {
+        body: Stack(children: <Widget>[
+          GoogleMap(
+            myLocationEnabled: true,
+            onMapCreated: _onMapCreated,
+            initialCameraPosition: CameraPosition(
+              target: const LatLng(49.2418584, -123.1401792),
+              zoom: 14,
+            ),
+            polylines: Set<Polyline>.of(_mapPolylines.values),
+            markers: _markers.values.toSet(),
+            onTap: (LatLng a) {
+              var abasdf = a;
+              setState(() {
+                _mapPolylines.clear();
+              });
+            },
+            onCameraIdle: () {
+              if (isSelected[0] == false) {
+                mapController.getZoomLevel().then((value) {
+                  if (value > 15) {
+                    zoomBool = false;
                     mapController.getVisibleRegion().then((value) {
-                      double lng =
-                          (value.northeast.longitude +
+                      double lng = (value.northeast.longitude +
                               value.southwest.longitude) /
-                              2;
-                      double lat =
-                          (value.northeast.latitude +
-                              value.southwest.latitude) / 2;
+                          2;
+                      double lat = (value.northeast.latitude +
+                              value.southwest.latitude) /
+                          2;
                       updateStops(lat.toString(), lng.toString());
                     });
+                  } else {
+                    setState(() {
+                      _markers.clear();
+                      zoomBool = true;
+                    });
                   }
-                },
-              ),
-              Positioned(
-                top: 35,
-                right: 15,
-                left: 15,
-                child: Container(
-                  color: Colors.white,
-                  child: Row(
-                    children: <Widget>[
-                      IconButton(
-                        splashColor: Colors.grey,
-                        icon: Icon(Icons.menu),
-                        onPressed: () {},
-                      ),
-                      Expanded(
-                        child: TextField(
-                          cursorColor: Colors.black,
-                          keyboardType: TextInputType.text,
-                          textInputAction: TextInputAction.go,
-                          decoration: InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 15),
-                              hintText: "Search..."),
-                        ),
-                      ),
-                    ],
+                });
+              }
+            },
+          ),
+          AnimatedOpacity(
+            opacity: zoomBool ? 1.0 : 0.0,
+            duration: Duration(milliseconds: 681),
+            child: Align(
+                alignment: Alignment.center,
+                child: RichText(
+                    text: TextSpan(
+                        style: TextStyle(
+                            fontWeight: FontWeight.w300,
+                            fontStyle: FontStyle.normal,
+                            fontSize: 18),
+                        text: 'Zoom in to see stops'))),
+          ),
+          Positioned(
+            top: 35,
+            right: 15,
+            left: 15,
+            child: Container(
+              color: Colors.white,
+              child: Row(
+                children: <Widget>[
+                  IconButton(
+                    splashColor: Colors.grey,
+                    icon: Icon(Icons.menu),
+                    onPressed: () {},
                   ),
-                ),
-              ),
-              Positioned(
-                top: 100,
-                right: 15,
-                left: 15,
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: Colors.black, width: 1.0),
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                  Expanded(
+                    child: TextField(
+                      cursorColor: Colors.black,
+                      keyboardType: TextInputType.text,
+                      textInputAction: TextInputAction.go,
+                      decoration: InputDecoration(
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 15),
+                          hintText: "Search..."),
                     ),
-                    child: ToggleButtons(
-                      fillColor: Colors.white,
-                      disabledColor: Colors.red,
-                      borderRadius: BorderRadius.circular(10),
-                      children: <Widget>[
-                        Icon(Icons.directions_bus),
-                        Icon(Icons.pin_drop),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 100,
+            right: 15,
+            left: 15,
+            child: Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black, width: 1.0),
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+                child: ToggleButtons(
+                  fillColor: Colors.white,
+                  disabledColor: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                  children: <Widget>[
+                    Icon(Icons.directions_bus),
+                    Icon(Icons.pin_drop),
 
-                        //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
-                      ],
-                      onPressed: (int index) {
-                        // Do some work (e.g. check sif the tap is valid)
-                        vibrate();
-                        // Do more work (e.g. respond to the tap)
-                        if (index == 0) {
-                          updateBuses();
-                        } else {
-                          getLocationAndUpdateStops();
-                        }
-                        setState(() {
-                          for (int buttonIndex = 0;
+                    //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
+                  ],
+                  onPressed: (int index) {
+                    // Do some work (e.g. check sif the tap is valid)
+                    vibrate();
+                    // Do more work (e.g. respond to the tap)
+                    if (index == 0) {
+                      updateBuses();
+                    } else {
+                      getLocationAndUpdateStops();
+                    }
+                    setState(() {
+                      for (int buttonIndex = 0;
                           buttonIndex < isSelected.length;
                           buttonIndex++) {
-                            if (buttonIndex == index) {
-                              isSelected[buttonIndex] = true;
-                            } else {
-                              isSelected[buttonIndex] = false;
-                            }
-                          }
-                        });
-                      },
-                      isSelected: isSelected,
-                    ),
-                  ),
+                        if (buttonIndex == index) {
+                          isSelected[buttonIndex] = true;
+                        } else {
+                          isSelected[buttonIndex] = false;
+                        }
+                      }
+                    });
+                  },
+                  isSelected: isSelected,
                 ),
               ),
-              DraggableScrollableSheet(
-                initialChildSize: 0.3,
-                minChildSize: 0.1,
-                maxChildSize: 0.8,
-                builder: (BuildContext context, myscrollController) {
-                  return Container(
-                    color: Colors.white,
+            ),
+          ),
+          DraggableScrollableSheet(
+            initialChildSize: 0.3,
+            minChildSize: 0.1,
+            maxChildSize: 0.8,
+            builder: (BuildContext context, myscrollController) {
+              return Container(
+                color: Colors.white,
+                child: Stack(children: [
+                  AnimatedOpacity(
+                    opacity: nextBuses.length > 0 ? 1.0 : 0.0,
+                    duration: Duration(milliseconds: 2),
                     child: ListView.builder(
                       controller: myscrollController,
                       itemCount: nextBuses.length,
                       itemBuilder: (BuildContext context, int index) {
                         return ListTile(
                             title: Column(
+                          children: <Widget>[
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: <Widget>[
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment
-                                      .start,
-                                  mainAxisAlignment: MainAxisAlignment
-                                      .spaceBetween,
-                                  children: <Widget>[
-                                    Container(
-                                      width: 60,
-                                      margin: const EdgeInsets.only(
-                                          right: 0, left: 0),
-                                      child: Text(
-                                        removeZeroes(
-                                            nextBuses[index].RouteNo),
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 28,
+                                Container(
+                                  width: 60,
+                                  margin:
+                                      const EdgeInsets.only(right: 0, left: 0),
+                                  child: Text(
+                                    removeZeroes(nextBuses[index].RouteNo),
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 28,
+                                        height: 1.0,
+                                        color: Colors.black),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: <Widget>[
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 5),
+                                        child: Text(
+                                          nextBuses[index].Destination,
+                                          textAlign: TextAlign.left,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.w600,
                                             height: 1.0,
-                                            color: Colors.black),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment
-                                            .start,
-                                        children: <Widget>[
-                                          Container(
-                                            margin: const EdgeInsets.only(
-                                                left: 5),
-                                            child: Text(
-                                              nextBuses[index].Destination,
-                                              textAlign: TextAlign.left,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 17,
-                                                fontWeight: FontWeight.w600,
-                                                height: 1.0,
-                                                color: getColorFromHex(
-                                                    '#024D7E'),
-                                              ),
-                                            ),
+                                            color: getColorFromHex('#024D7E'),
                                           ),
-                                          Container(
-                                            margin: const EdgeInsets.only(
-                                                left: 5),
-                                            child: Text(
-                                              patternHelper(nextBuses[index].Pattern)+" at \n"+nextBuses[index].nextStop.toString(),
-                                              textAlign: TextAlign.left,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                  fontSize: 15,
-                                                  height: 1.0,
-                                                  fontWeight: FontWeight.w400,
-                                                  color: Colors.deepOrange),
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
-                                    Container(
-                                      width: 70,
-                                      child: Text(
-                                        nextBuses[index].ExpectedCountdown
+                                      Container(
+                                        margin: const EdgeInsets.only(left: 5),
+                                        child: Text(
+                                          patternHelper(
+                                                  nextBuses[index].Pattern) +
+                                              " at \n" +
+                                              nextBuses[index]
+                                                  .nextStop
+                                                  .toString(),
+                                          textAlign: TextAlign.left,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                              fontSize: 15,
+                                              height: 1.0,
+                                              fontWeight: FontWeight.w400,
+                                              color: Colors.deepOrange),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  width: 80,
+                                  child: Text(
+                                    nextBuses[index]
+                                            .ExpectedCountdown
                                             .toString() +
-                                            " min",
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                            fontSize: 22,
-                                            height: 1.0,
-                                            color: Colors.black),
-                                      ),
-                                    )
-                                  ],
-                                ),
-                                Divider(
-                                  color: Theme
-                                      .of(context)
-                                      .primaryColor,
-                                ),
+                                        " min",
+                                    textAlign: TextAlign.center,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 22,
+                                        height: 1.0,
+                                        color: Colors.black),
+                                  ),
+                                )
                               ],
-                            ));
+                            ),
+                            Divider(
+                              color: Theme.of(context).primaryColor,
+                            ),
+                          ],
+                        ));
                       },
                     ),
-                  );
-                },
-              ),
-            ]),
-          ));
+                  ),
+                  AnimatedOpacity(
+                      opacity: nextBuses.length == 0 ? 1.0 : 0.0,
+                      duration: Duration(milliseconds: 2),
+                      child: Align(
+                        alignment: Alignment.center,
+                        child: RichText(
+                            text: TextSpan(
+                                style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w500,
+                                    fontStyle: FontStyle.normal,
+                                    fontSize: 19),
+                                text: 'No buses found near you')),
+                  ))
+                ]),
+              );
+            },
+          ),
+        ]),
+      ));
 }
 
 ///

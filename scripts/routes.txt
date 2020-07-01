@@ -1,0 +1,230 @@
+route_long_name,route_type,route_text_color,route_color,agency_id,route_id,route_url,route_desc,route_short_name
+Hastings Street,3,FFFFFF,008522,TL,37807,,,R5
+Coquitlam Central Station/Lafarge Park,3,,,TL,30051,,,189
+Coquitlam Central Station/Parkway Blvd,3,,,TL,30050,,,187
+Expo Line,1,FFFFFF,0033a0,TL,30053,,,
+Millennium Line,1,333333,ffcd00,TL,30052,,,
+Main St Station/Beach,3,,,TL,30055,,,023
+Murrayville/Langley Centre,3,,,TL,34044,,,560
+Edmonds Station/Metrotown Station,3,,,TL,32799,,,119
+Two Road/Brighouse Station,3,,,TL,6723,,,402
+Richmond-Brighouse Station/One Road,3,,,TL,6722,,,401
+Langley Centre/King George Station,3,,,TL,6721,,,395
+White Rock/King George Station Express,3,,,TL,6720,,,394
+Gilbert/Bridgeport,3,,,TL,6727,,,407
+Five Road/Cambie,3,,,TL,6726,,,405
+Four Road/Brighouse Station,3,,,TL,6725,,,404
+Bridgeport Station/Three Road,3,,,TL,6724,,,403
+Haney Place/Cottonwood,3,,,TL,34042,,,745
+Richmond-Brighouse Station/22nd St Station,3,,,TL,6728,,,410
+Downtown/Fraser NightBus,3,,,TL,6840,,,N8
+Haney Place/Albion,3,,,TL,34043,,,746
+Downtown/Lougheed Station/Coquitlam Central Station,3,,,TL,6841,,,N9
+Edmonds Station/Metrotown Station,3,,,TL,6648,,,116
+New West Station/Brentwood Station,3,,,TL,6649,,,123
+22nd St Station/Annacis Island,3,,,TL,6644,,,104
+New Westminster Station/Edmonds Station,3,,,TL,6645,,,106
+Lougheed Station/Metrotown Station,3,,,TL,6646,,,110
+Edmonds Station/New West Station,3,,,TL,6647,,,112
+Commercial-Broadway/UBC (B-Line),3,FFFFFF,d04110,TL,6641,,,099
+22nd St Station/Marpole Loop,3,,,TL,6642,,,100
+Lougheed Station/22nd St Station,3,,,TL,6643,,,101
+Boundary Bay/South Delta Recreation Centre,3,,,TL,6844,,,619
+English Bluff/South Delta Exchange,3,,,TL,6843,,,614
+Coquitlam Central Station/Lansdowne,3,,,TL,30048,,,185
+Coquitlam Central Station/Hampton Park,3,,,TL,30049,,,186
+Coquitlam Central Station/Buntzen Lake,3,,,TL,30042,,,179
+Moody Centre Station/Lougheed Station,3,,,TL,30043,,,180
+Coquitlam Central Station/Rocklin,3,,,TL,30040,,,174
+Coquitlam Central Station/Meridian,3,,,TL,30041,,,175
+Moody Centre Station/Coquitlam Central Station,3,,,TL,30046,,,183
+Moody Centre Station/Noons Creek,3,,,TL,30047,,,184
+Moody Centre Station/Ioco,3,,,TL,30044,,,181
+Moody Centre Station/Belcarra,3,,,TL,30045,,,182
+Harbourside/Lonsdale Quay,3,,,TL,18213,,,231
+Scottsdale/Scott Road Station,3,,,TL,6718,,,391
+Newton Exchange/Surrey Central Station,3,,,TL,6719,,,393
+Ocean Park/Bridgeport Station,3,,,TL,6716,,,352
+White Rock South/Bridgeport Station,3,,,TL,6717,,,354
+King George Station/White Rock Centre,3,,,TL,6714,,,345
+Crescent Beach/Bridgeport Station,3,,,TL,6715,,,351
+Newton/Surrey Central Station,3,,,TL,6712,,,335
+Canada Line,1,FFFFFF,007c9f,TL,13686,,,
+Surrey Central Station/Scottsdale,3,,,TL,6710,,,329
+Richmond Oval/Brighouse Station,3,,,TL,13684,,,414
+Uptown/New Westminster Station,3,,,TL,6796,,,105
+Brighouse/Ironwood/Riverport,3,,,TL,34543,,,408
+Quayside/Victoria Hill,3,,,TL,6790,,,103
+Coquitlam Central Station/Burquitlam Station,3,,,TL,6659,,,151
+SFU/Production Station,3,,,TL,6658,,,145
+SFU/Metrotown Station,3,,,TL,6657,,,144
+Lougheed Station/Brentwood Station,3,,,TL,6654,,,136
+Lake City Station/Brentwood Station,3,,,TL,6652,,,134
+Metrotown/Pender/Kootenay,3,,,TL,6651,,,130
+Patterson Station/Holdom Station,3,,,TL,6650,,,129
+Haney Place/Braid Station,3,,,TL,7224,,,791
+29th Avenue Station/UBC,3,,,TL,11201,,,033
+Fraser Heights/Guildford/Surrey Centre,3,,,TL,17707,,,337
+Alma/Spanish Banks,3,,,TL,11202,,,042
+Surrey Central/Sunbury,3,,,TL,6701,,,314
+Scottsdale/Scott Road Station,3,,,TL,6700,,,312
+Scott Station/Newton Exchange/Scottsdale,3,,,TL,6703,,,319
+Surrey Central Station/Scottsdale,3,,,TL,6702,,,316
+White Rock/Newton/Surrey Central Station,3,,,TL,6705,,,321
+Langley/Fleetwood/Surrey Central Station,3,,,TL,6704,,,320
+Newton Exchange/Surrey Central Station,3,,,TL,6707,,,324
+Newton Exchange/Surrey Central Station,3,,,TL,6706,,,323
+Indian River/Phibbs Exchange,3,,,TL,6780,,,215
+Coquitlam Central Station/Braid Station,3,,,TL,6668,,,169
+Braid Station/22nd Street Station,3,,,TL,6662,,,128
+Braid Station/22nd Street  Station,3,,,TL,6663,,,155
+Coquitlam Central Station/Lougheed Station,3,,,TL,6660,,,152
+Coquitlam Central Station/Braid Station,3,,,TL,6661,,,153
+Coquitlam Central Station/Braid Station,3,,,TL,6666,,,159
+Port Coquitlam Station/Kootenay Loop,3,,,TL,6667,,,160
+Braid Station/Lougheed Station,3,,,TL,6664,,,156
+Burquitlam Station/Lougheed Station,3,,,TL,6665,,,157
+Langley Centre/Newton Exchange,3,,,TL,29038,,,342
+Kootenay Loop/Joyce Station,3,,,TL,6629,,,027
+Newton Exchange/Scottsdale,3,,,TL,6821,,,322
+Scottsdale/Ladner Exchange,3,,,TL,6822,,,310
+Ladner South/Ladner Exchange,3,,,TL,6823,,,616
+East Ladner/Ladner Exchange,3,,,TL,6824,,,617
+Ladner North/Ladner Exchange,3,,,TL,6825,,,618
+Bridgeport Station/Sea Island South,3,,,TL,6827,,,412
+Riverport/Steveston,3,,,TL,6828,,,413
+East Cambie/Brighouse Station,3,,,TL,6829,,,416
+Blueridge/Phibbs Exchange/Burrard Station,3,,,TL,6675,,,214
+Deep Cove/Phibbs Exchange,3,,,TL,6674,,,212
+Lynn Valley/Lonsdale Quay,3,,,TL,6677,,,229
+Lynn Valley/Lonsdale Quay,3,,,TL,6676,,,228
+Seymour/Phibbs Exchange/Burrard Station,3,,,TL,6673,,,211
+New Westminster Station/Lougheed Station,3,,,TL,16719,,,109
+Upper Lynn Valley/Burrard Station,3,,,TL,16717,,,209
+Grouse Mountain/Phibbs Exchange,3,,,TL,6679,,,232
+Upper Lonsdale/Lonsdale Quay,3,,,TL,6678,,,230
+Cloverdale/Willowbrook,3,,,TL,8286,,,370
+Eagle Cliff/Snug Cove,3,,,TL,6778,,,281
+Lions Bay/Caulfeild,3,,,TL,6779,,,262
+Richmond Brighouse Station/Steveston,3,,,TL,34542,,,406
+Tsawwassen First Nation/South Delta,3,,,TL,11696,,,609
+Hastings @ Gilmore/Kootenay Loop,3,,,TL,6776,,,131
+Bluewater/Snug Cove,3,,,TL,6777,,,280
+Langley Centre/Scottsdale Exchange,3,,,TL,11692,,,364
+22nd St Station/Carvolth Exchange,3,,,TL,11693,,,388
+Aldergrove/Surrey Central Station,3,,,TL,23384,,,503
+Downtown/UBC NightBus,3,,,TL,6833,,,N17
+Downtown/Cambie NightBus,3,,,TL,6831,,,N15
+Langley Centre/Brookswood,3,,,TL,34045,,,561
+Downtown/Lynn Valley NightBus,3,,,TL,6837,,,N24
+Downtown/Macdonald NightBus,3,,,TL,6836,,,N22
+Downtown/Victoria NightBus,3,,,TL,6835,,,N20
+Downtown/Surrey Central Station NightBus,3,,,TL,6834,,,N19
+Upper Lynn Valley/Burrard Station,3,,,TL,6672,,,210
+Lougheed Hwy,3,FFFFFF,008522,TL,37809,,,R3
+King George Blvd,3,FFFFFF,008522,TL,37808,,,R1
+Guildford/Newton Exchange,3,,,TL,8290,,,341
+Phibbs Exchange/Joyce Station,3,,,TL,6630,,,028
+Haney Place/Maple Meadows Station/Meadowtown,3,,,TL,6799,,,743
+Queens/Park Royal,3,,,TL,6688,,,251
+Phibbs/Capilano,3,,,TL,39307,,,245
+Metrotown Station/River District,3,,,TL,39304,,,031
+Metrotown Station/Phibbs Exchange,3,,,TL,39305,,,222
+Hastings/UBC,3,,,TL,16718,,,014
+Inglewood/Park Royal,3,,,TL,6689,,,252
+Mt Gardner/Snug Cove,3,,,TL,34544,,,282
+Marine Dr,3,FFFFFF,008522,TL,38311,,,R2
+Grouse Mountain/Lonsdale Quay,3,,,TL,6680,,,236
+Lynn Valley/Downtown,3,,,TL,6682,,,240
+Upper Lonsdale/Downtown,3,,,TL,6683,,,241
+Highland/Downtown,3,,,TL,6685,,,246
+Grouse Mountain/Downtown,3,,,TL,6686,,,247
+Horseshoe Bay/Dundarave/Vancouver,3,,,TL,6687,,,250
+41st Ave,3,FFFFFF,008522,TL,37810,,,R4
+Elliott/29th Avenue Station,3,,,TL,6631,,,029
+Royal Oak Station/Edmonds Station,3,,,TL,6806,,,148
+Coquitlam Central Station/Port Coquitlam Station,3,,,TL,22638,,,188
+Lynn Valley Centre/Phibbs Exchange,3,,,TL,22639,,,227
+Haney Place/Maple Meadows Station/Meadowtown,3,,,TL,6800,,,744
+Main/Downtown,3,,,TL,6613,,,003
+Macdonald/Downtown,3,,,TL,6612,,,002
+Downtown/Richmond NightBus,3,,,TL,6830,,,N10
+Nanaimo Station/Dunbar,3,,,TL,6617,,,007
+Davie/Downtown,3,,,TL,6616,,,006
+Robson/Downtown,3,,,TL,6615,,,005
+Powell/Downtown/UBC,3,,,TL,6614,,,004
+Boundary/Commercial-Broadway/Granville/Alma/UBC,3,,,TL,6619,,,009
+Fraser/Downtown,3,,,TL,6618,,,008
+Ocean Park/Peace Arch Hospital,3,,,TL,31816,,,360
+Ocean Park/White Rock Centre,3,,,TL,31817,,,361
+Whitby Estate/Park Royal/Spuraway,3,,,TL,10232,,,256
+Seaside/White Rock Centre,3,,,TL,31818,,,362
+Southpoint/Peace Arch Hospital,3,,,TL,31819,,,363
+Scottsdale/Bridgeport Station,3,,,TL,6699,,,311
+Newton Exchange/Brighouse Station,3,,,TL,6698,,,301
+Horseshoe Bay/Vancouver Express,3,,,TL,6693,,,257
+Dundarave/Capilano University,3,,,TL,6692,,,255
+British Properties/Park Royal/Van,3,,,TL,6691,,,254
+Caulfeild/Vancouver/Park Royal,3,,,TL,6690,,,253
+Scottsdale/22nd St Station,3,,,TL,6713,,,340
+Guildford/Surrey Central Station,3,,,TL,6819,,,373
+Surrey Central/Scott Rd Station,3,,,TL,6818,,,371
+Coquitlam Central Station/Fremont,3,,,TL,30037,,,171
+Port Coquitlam Station/Port Coquitlam South,3,,,TL,30036,,,170
+White Rock Centre/Willowbrook,3,,,TL,18705,,,531
+Metrotown Station/Suncrest,3,,,TL,6811,,,146
+West Coast Express,2,FFFFFF,87189d,TL,6770,,,WCE
+Coquitlam Central Station/Cedar,3,,,TL,30039,,,173
+Coquitlam Central Station/Riverside,3,,,TL,30038,,,172
+Langley Centre/Fernridge,3,,,TL,6815,,,563
+Langley Centre/Walnut Grove,3,,,TL,6814,,,562
+Metrotown Station/Edmonds Station,3,,,TL,6817,,,147
+Langley Centre/Willowbrook,3,,,TL,6816,,,564
+Ladner Ring,3,,,TL,6745,,,606
+English Bluff/Bridgeport,3,,,TL,6744,,,604
+Tsawwassen Ferry/Bridgeport Station,3,,,TL,6747,,,620
+Ladner Ring,3,,,TL,6746,,,608
+South Delta/Boundary Bay/Bridgeport,3,,,TL,6741,,,601
+Joyce Station/29th Avenue Station,3,,,TL,6628,,,026
+Tsawwassen Heights/Bridgeport,3,,,TL,6742,,,602
+Knight/Downtown,3,,,TL,6626,,,022
+Brentwood Station/UBC,3,,,TL,6627,,,025
+Metrotown Station/Stanley Park,3,,,TL,6624,,,019
+Maple Meadows Station/Langley Centre,3,,,TL,12940,,,595
+29th Avenue Station/Arbutus,3,,,TL,6622,,,016
+Oak/Downtown,3,,,TL,6623,,,017
+Granville/Downtown,3,,,TL,6620,,,010
+Cambie/Olympic Village Station,3,,,TL,6621,,,015
+Holdom Station/Edmonds Station,3,,,TL,33292,,,133
+Anderson Creek/Haney Place/Port Haney St,3,,,TL,31822,,,741
+Rock Ridge/Haney Place/Port Haney Station,3,,,TL,31821,,,733
+Clayton Heights/Langley Centre,3,,,TL,31820,,,372
+White Rock/White Rock South/Guildford,3,,,TL,7321,,,375
+Capitol Hill/Hastings @ Gilmore,3,,,TL,7322,,,132
+Newton Exchange/Surrey Central Station,3,,,TL,6708,,,325
+Haney/Maple Ridge East/Coquitlam Station,3,,,TL,6749,,,701
+Ladner Exchange/Scott Road Station,3,,,TL,6748,,,640
+Lonsdale Quay/Delbrook,3,,,TL,36799,,,249
+UBC/Downtown,3,,,TL,6635,,,044
+Thornhill/Haney Place,3,,,TL,6804,,,748
+Ruskin/Haney Place,3,,,TL,6805,,,749
+Coquitlam Central Station/Princeton,3,,,TL,30584,,,191
+Downtown/SFU NightBus,3,,,TL,6838,,,N35
+UBC Exchange/Wesbrook Village,3,,,TL,33538,,,068
+Metrotown/Brighouse Station,3,,,TL,6730,,,430
+UBC/VCC-Clark Station,3,,,TL,6638,,,084
+Meadowtown/Bonson,3,,,TL,34541,,,722
+Meadowtown/Fraser Way,3,,,TL,34540,,,719
+Langley Centre/Surrey Central Station,3,,,TL,6737,,,501
+Langley Centre/Surrey Central Station,3,,,TL,6738,,,502
+Walnut Grove/Surrey Central Station,3,,,TL,6739,,,509
+Joyce Station/Crown,3,,,TL,6633,,,041
+Carvolth Exchange/Lougheed Station,3,,,TL,20667,,,555
+Waterfront Station/False Creek South,3,,,TL,6637,,,050
+Metrotown Station/Dunbar Loop/UBC,3,,,TL,6636,,,049
+Kingswood/22nd St Station,3,,,TL,9745,,,418
+Guildford/Surrey Central Station,3,,,TL,6709,,,326
+Victoria/Downtown,3,,,TL,6625,,,020
+SeaBus,4,FFFFFF,746661,TL,6771,,,
+Beach Grove/Bridgeport,3,,,TL,6743,,,603
+Coquitlam Central Station/White Pine Beach,3,,,TL,7509,,,150

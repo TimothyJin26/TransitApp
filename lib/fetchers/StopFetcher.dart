@@ -36,6 +36,7 @@ class StopFetcher {
           'Unexpected status code ${response.statusCode}:'
               ' ${response.reasonPhrase}',
           uri: Uri.parse(stopLocationsURL));
+
     }
   }
 }
