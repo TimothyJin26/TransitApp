@@ -9,9 +9,11 @@ import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:location/location.dart';
+import 'package:transitapp/searchbar/searchBar.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:vibrate/vibrate.dart';
 
+import 'Util.dart';
 import 'fetchers/BusAtStopFetcher.dart';
 import 'fetchers/RouteMapCoordinateHelper.dart';
 import 'fetchers/StopFetcher.dart';
@@ -38,8 +40,14 @@ class _TransitAppState extends State<TransitApp> {
   List<bool> isSelected = [true, false];
   List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
   List<Trip> nextBuses = [];
+  var timeNow = new DateTime.now();
+  var timeDifference = new Duration();
+  var timeLastUpdated = DateTime.now();
+  var isLoading = true;
+  var zoomBool = false;
+  var isSearching = false;
 
-  bool zoomBool = false;
+  var asdiufkhaiyse = 25.0;
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -56,24 +64,28 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void timerIfSelectedHelperShort() {
+    timeNow = DateTime.now();
+    setState(() {
+      timeDifference = timeNow.difference(timeLastUpdated);
+    });
     if (isSelected[0] == true)
       setState(() {
         for (String key in _markers.keys) {
           final marker = Marker(
               onTap: _markers[key].onTap,
               markerId: _markers[key].markerId,
-              position: LatLng(_markers[key].position.latitude + 0.1,
+              position: LatLng(_markers[key].position.latitude + 0.0001,
                   _markers[key].position.longitude + 0.1),
               infoWindow: _markers[key].infoWindow,
               icon: _markers[key].icon);
           _markers[key] = marker;
-          print("66");
           //The Great Migration
         }
       });
   }
 
   void timerIfSelectedHelper() {
+    timeLastUpdated = DateTime.now();
     if (isSelected[0] == true) {
       updateBuses();
     }
@@ -120,6 +132,7 @@ class _TransitAppState extends State<TransitApp> {
 
       final marker = Marker(
           onTap: () {
+//            mapController.showMarkerInfoWindow(MarkerId(bus.VehicleNo));
             setState(() {
               _mapPolylines.clear();
             });
@@ -137,8 +150,10 @@ class _TransitAppState extends State<TransitApp> {
           markerId: MarkerId(bus.VehicleNo),
           position: LatLng(bus.Latitude, bus.Longitude),
           infoWindow: InfoWindow(
-            title: bus.RouteNo,
-            snippet: bus.Pattern,
+            title: bus.Pattern,
+            snippet: "Last updated: " +
+                timeDifference.inSeconds.toString() +
+                "seconds ago",
           ),
           icon: bitmapDescriptor);
       l.add(marker);
@@ -166,6 +181,47 @@ class _TransitAppState extends State<TransitApp> {
 
   ///MightyFamine
   void updateScrollableStopListOnTap() {}
+
+  ///FantasticFamine
+  Future<List<Stop>> search(String search) async {
+    setState(() {
+      asdiufkhaiyse = 100.0;
+
+      isSearching = true;
+    });
+    String stopList = await rootBundle.loadString('assets/stops.txt');
+    List<String> lines = stopList.split('\n');
+    lines.removeAt(0);
+    print(lines.toString());
+    //headers^
+    List<Stop> toRet = [];
+    print("to retu" + lines.length.toString());
+    int counter = 0;
+    for (String l in lines) {
+      Stop s = new Stop();
+      List<String> paste = l.split(',');
+
+      if (paste.length >= 6 &&
+          (paste[1].toLowerCase().contains(search.toLowerCase()) ||
+              paste[2].contains(search))) {
+        print("added");
+
+        s.StopNo = (int.parse(paste[1]));
+        s.Name = paste[2];
+        s.Longitude = double.parse(paste[5]);
+        s.Latitude = double.parse(paste[4]);
+        toRet.add(s);
+        counter++;
+
+        if (counter > 20) {
+          break;
+        }
+      }
+    }
+    print("fqwef234f");
+    print("to retu" + toRet.length.toString());
+    return toRet;
+  }
 
   ///
   /// Get a list of stop markers that can be used to plot on the map
@@ -226,6 +282,9 @@ class _TransitAppState extends State<TransitApp> {
   /// Calls the Translink API and updates the bus locations on the map
   ///
   void updateBuses() async {
+    setState(() {
+      isLoading = true;
+    });
     // Fetch buses around the user based on the user location
     LocationFetcher locationFetcher = new LocationFetcher();
     Future<List<Bus>> future = locationFetcher.fetchAllBuses();
@@ -237,6 +296,7 @@ class _TransitAppState extends State<TransitApp> {
 
     // Sets the state to update the markers on the map
     setState(() {
+      isLoading = false;
       _markers.clear();
       print("230");
       for (int i = 0; i < list.length; i++) {
@@ -316,6 +376,7 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   GoogleMapController mapController;
+  SearchBarController<Stop> searchBarController = SearchBarController();
 
   ///
   /// Called when the map is first created
@@ -386,6 +447,7 @@ class _TransitAppState extends State<TransitApp> {
         body: Stack(children: <Widget>[
           GoogleMap(
             myLocationEnabled: true,
+            myLocationButtonEnabled: false,
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
               target: const LatLng(49.2418584, -123.1401792),
@@ -435,34 +497,6 @@ class _TransitAppState extends State<TransitApp> {
                             fontStyle: FontStyle.normal,
                             fontSize: 18),
                         text: 'Zoom in to see stops'))),
-          ),
-          Positioned(
-            top: 35,
-            right: 15,
-            left: 15,
-            child: Container(
-              color: Colors.white,
-              child: Row(
-                children: <Widget>[
-                  IconButton(
-                    splashColor: Colors.grey,
-                    icon: Icon(Icons.menu),
-                    onPressed: () {},
-                  ),
-                  Expanded(
-                    child: TextField(
-                      cursorColor: Colors.black,
-                      keyboardType: TextInputType.text,
-                      textInputAction: TextInputAction.go,
-                      decoration: InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 15),
-                          hintText: "Search..."),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ),
           Positioned(
             top: 100,
@@ -518,119 +552,234 @@ class _TransitAppState extends State<TransitApp> {
             maxChildSize: 0.8,
             builder: (BuildContext context, myscrollController) {
               return Container(
-                color: Colors.white,
-                child: Stack(children: [
-                  AnimatedOpacity(
-                    opacity: nextBuses.length > 0 ? 1.0 : 0.0,
-                    duration: Duration(milliseconds: 2),
-                    child: ListView.builder(
-                      controller: myscrollController,
-                      itemCount: nextBuses.length,
-                      itemBuilder: (BuildContext context, int index) {
-                        return ListTile(
-                            title: Column(
-                          children: <Widget>[
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: <Widget>[
-                                Container(
-                                  width: 60,
-                                  margin:
-                                      const EdgeInsets.only(right: 0, left: 0),
-                                  child: Text(
-                                    removeZeroes(nextBuses[index].RouteNo),
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontSize: 28,
-                                        height: 1.0,
-                                        color: Colors.black),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Column(
+                  color: Colors.deepOrangeAccent.withOpacity(0.0),
+                  child: Stack(children: [
+                    Container(
+                      margin: const EdgeInsets.fromLTRB(0.0, 27.0, 0.0, 0.0),
+                      color: Colors.white,
+                      child: Stack(children: [
+                        AnimatedOpacity(
+                          opacity: nextBuses.length > 0 ? 1.0 : 0.0,
+                          duration: Duration(milliseconds: 2),
+                          child: ListView.builder(
+                            controller: myscrollController,
+                            itemCount: nextBuses.length,
+                            itemBuilder: (BuildContext context, int index) {
+                              return ListTile(
+                                  title: Column(
+                                children: <Widget>[
+                                  Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: <Widget>[
                                       Container(
-                                        margin: const EdgeInsets.only(left: 5),
+                                        width: 60,
+                                        margin: const EdgeInsets.only(
+                                            right: 0, left: 0),
                                         child: Text(
-                                          nextBuses[index].Destination,
-                                          textAlign: TextAlign.left,
+                                          removeZeroes(
+                                              nextBuses[index].RouteNo),
+                                          textAlign: TextAlign.center,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w600,
-                                            height: 1.0,
-                                            color: getColorFromHex('#024D7E'),
-                                          ),
+                                              fontSize: 28,
+                                              height: 1.0,
+                                              color: Colors.black),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                  left: 5),
+                                              child: Text(
+                                                nextBuses[index].Destination,
+                                                textAlign: TextAlign.left,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 17,
+                                                  fontWeight: FontWeight.w600,
+                                                  height: 1.0,
+                                                  color: getColorFromHex(
+                                                      '#024D7E'),
+                                                ),
+                                              ),
+                                            ),
+                                            Container(
+                                              margin: const EdgeInsets.only(
+                                                  left: 5),
+                                              child: Text(
+                                                patternHelper(nextBuses[index]
+                                                        .Pattern) +
+                                                    " at \n" +
+                                                    nextBuses[index]
+                                                        .nextStop
+                                                        .toString(),
+                                                textAlign: TextAlign.left,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                    fontSize: 15,
+                                                    height: 1.0,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: Colors.deepOrange),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                       Container(
-                                        margin: const EdgeInsets.only(left: 5),
+                                        width: 80,
                                         child: Text(
-                                          patternHelper(
-                                                  nextBuses[index].Pattern) +
-                                              " at \n" +
-                                              nextBuses[index]
-                                                  .nextStop
-                                                  .toString(),
-                                          textAlign: TextAlign.left,
+                                          nextBuses[index]
+                                                  .ExpectedCountdown
+                                                  .toString() +
+                                              " min",
+                                          textAlign: TextAlign.center,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
-                                              fontSize: 15,
+                                              fontSize: 22,
                                               height: 1.0,
-                                              fontWeight: FontWeight.w400,
-                                              color: Colors.deepOrange),
+                                              color: Colors.black),
                                         ),
-                                      ),
+                                      )
                                     ],
                                   ),
-                                ),
-                                Container(
-                                  width: 80,
-                                  child: Text(
-                                    nextBuses[index]
-                                            .ExpectedCountdown
-                                            .toString() +
-                                        " min",
-                                    textAlign: TextAlign.center,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        fontSize: 22,
-                                        height: 1.0,
-                                        color: Colors.black),
+                                  Divider(
+                                    color: Theme.of(context).primaryColor,
                                   ),
-                                )
-                              ],
-                            ),
-                            Divider(
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ],
-                        ));
-                      },
+                                ],
+                              ));
+                            },
+                          ),
+                        ),
+                        AnimatedOpacity(
+                            opacity: nextBuses.length == 0 ? 1.0 : 0.0,
+                            duration: Duration(milliseconds: 2),
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: RichText(
+                                  text: TextSpan(
+                                      style: TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.w500,
+                                          fontStyle: FontStyle.normal,
+                                          fontSize: 19),
+                                      text: 'No buses found near you')),
+                            )),
+                      ]),
                     ),
-                  ),
-                  AnimatedOpacity(
-                      opacity: nextBuses.length == 0 ? 1.0 : 0.0,
-                      duration: Duration(milliseconds: 2),
-                      child: Align(
-                        alignment: Alignment.center,
-                        child: RichText(
-                            text: TextSpan(
-                                style: TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w500,
-                                    fontStyle: FontStyle.normal,
-                                    fontSize: 19),
-                                text: 'No buses found near you')),
-                  ))
-                ]),
-              );
+                    Positioned(
+                        right: 0.0,
+                        child: Container(
+                          width: 65.0,
+                          height: 25.0,
+                          decoration: new BoxDecoration(
+                              color: Colors.grey,
+                              shape: BoxShape.rectangle,
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(8.0))),
+                          child: Align(
+                              alignment: Alignment.center,
+                              child: RichText(
+                                  text: TextSpan(children: [
+                                WidgetSpan(
+                                    child: isLoading
+                                        ? Spinner(
+                                            icon: Icons.autorenew,
+                                          )
+                                        : Icon(
+                                            Icons.rss_feed,
+                                            size: 16,
+                                          )),
+                                !isLoading
+                                    ? TextSpan(
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w400,
+                                            fontStyle: FontStyle.normal,
+                                            fontSize: 13),
+                                        text: ((30 - timeDifference.inSeconds)
+                                                .toString()) +
+                                            " sec")
+                                    : TextSpan(text: ""),
+                              ]))),
+                        )),
+                  ]));
             },
           ),
+          Positioned(
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            child: AnimatedOpacity(
+              opacity: isSearching ? 1.0 : 0.0,
+              duration: Duration(milliseconds: 300),
+              child: Container(
+                  decoration: BoxDecoration(
+                color: Colors.white,
+              )),
+            ),
+          ),
+          Container(
+              height: asdiufkhaiyse,
+              child: TransitSearchBar<Stop>(
+                searchBarController: searchBarController,
+                hintText: "Potato",
+                shrinkWrap: true,
+                placeHolder: SizedBox.shrink(),
+                contentPadding: EdgeInsets.all(10),
+                searchBarPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                searchBarStyle: SearchBarStyle(
+                  searchBarHeight: 45,
+                  backgroundColor: Colors.white,
+                  padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                onSearch: search,
+                onCancelled: () {
+                  FocusScope.of(context).requestFocus(FocusNode());
+                  setState(() {
+                    asdiufkhaiyse = 25.0;
+                    isSearching = false;
+                  });
+                },
+                onError: (error) {
+                  print(error.stackTrace.toString());
+                  return Text("no error");
+                },
+                emptyWidget: Align(
+                  alignment: Alignment.center,
+                  child: RichText(
+                      text: TextSpan(
+                          style: TextStyle(
+                              color: Colors.black87,
+                              fontStyle: FontStyle.normal,
+                              fontSize: 18),
+                          text: 'No Stops Found')),
+                ),
+                onItemFound: (Stop post, int index) {
+                  print("asdfaggrrefafseghg");
+                  return ListTile(
+                    title: Text(post.StopNo.toString()),
+                    subtitle: Text(post.Name),
+                    onTap: () {
+                      searchBarController.clear();
+                      CameraPosition _kLake = CameraPosition(
+                          target: LatLng(post.Latitude, post.Longitude),
+                          zoom: 19.151926040649414);
+
+                      mapController.animateCamera(
+                          CameraUpdate.newCameraPosition(_kLake));
+                    },
+                  );
+                },
+              )),
         ]),
       ));
 }
@@ -646,4 +795,11 @@ Color getColorFromHex(String hexColor) {
   }
 
   return Color(int.parse(hexColor, radix: 16));
+}
+
+class Post {
+  final String title;
+  final String description;
+
+  Post(this.title, this.description);
 }

@@ -46,15 +46,15 @@ class Stop {
   // Takes the Bus object and turns it into a json map
   Map<String, dynamic> toJson() => _$StopToJson(this);
 
-  final int StopNo;
-  final String Name;
-  final String BayNo;
-  final String City;
-  final String OnStreet;
-  final String AtStreet;
-  final double Latitude;
-  final double Longitude;
-  final int WheelchairAccess;
-  final int Distance;
-  final String Routes;
+  int StopNo;
+  String Name;
+  String BayNo;
+  String City;
+  String OnStreet;
+  String AtStreet;
+  double Latitude;
+  double Longitude;
+  int WheelchairAccess;
+  int Distance;
+  String Routes;
 }

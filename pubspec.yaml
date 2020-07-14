@@ -17,6 +17,10 @@ environment:
   sdk: ">=2.1.0 <3.0.0"
 
 dependencies:
+  flappy_search_bar:
+    git:
+      url: git://github.com/TimothyJin26/flappy_search_bar.git
+      ref: master
   geolocator: ^5.3.2+2
   archive: 2.0.13
   vibrate: ^0.0.4
@@ -52,6 +56,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+     - assets/
      - images/
 
   # An image asset can refer to one or more resolution-specific "variants", see
