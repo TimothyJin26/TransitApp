@@ -46,8 +46,9 @@ class _TransitAppState extends State<TransitApp> {
   var isLoading = true;
   var zoomBool = false;
   var isSearching = false;
-
-  var asdiufkhaiyse = 25.0;
+  var highlightedStopNo;
+  var listOfStops = List<Stop>();
+  var count = 0;
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -56,6 +57,25 @@ class _TransitAppState extends State<TransitApp> {
 
   @override
   void initState() {
+    listOfStops.clear();
+    rootBundle.loadString('assets/stops.txt').then((stopList) {
+      List<String> lines = stopList.split('\n');
+      lines.removeAt(0);
+      for (String l in lines) {
+        Stop s = new Stop();
+        List<String> paste = l.split(',');
+        try {
+          s.StopNo = (int.parse(paste[1]));
+        } catch (e) {
+          continue;
+        }
+        s.Name = paste[2];
+        s.Longitude = double.parse(paste[5]);
+        s.Latitude = double.parse(paste[4]);
+        listOfStops.add(s);
+      }
+    });
+
     super.initState();
     timer = Timer.periodic(
         Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
@@ -184,34 +204,23 @@ class _TransitAppState extends State<TransitApp> {
 
   ///FantasticFamine
   Future<List<Stop>> search(String search) async {
+    int counter = 0;
     setState(() {
-      asdiufkhaiyse = 100.0;
-
       isSearching = true;
     });
-    String stopList = await rootBundle.loadString('assets/stops.txt');
-    List<String> lines = stopList.split('\n');
-    lines.removeAt(0);
-    print(lines.toString());
-    //headers^
-    List<Stop> toRet = [];
-    print("to retu" + lines.length.toString());
-    int counter = 0;
-    for (String l in lines) {
-      Stop s = new Stop();
-      List<String> paste = l.split(',');
-
-      if (paste.length >= 6 &&
-          (paste[1].toLowerCase().contains(search.toLowerCase()) ||
-              paste[2].contains(search))) {
-        print("added");
-
-        s.StopNo = (int.parse(paste[1]));
-        s.Name = paste[2];
-        s.Longitude = double.parse(paste[5]);
-        s.Latitude = double.parse(paste[4]);
-        toRet.add(s);
+    List<Stop> toRet = new List<Stop>();
+    print(listOfStops.length.toString() + "asdfaesfasdfasdfasdf");
+    for (Stop s in listOfStops) {
+      if (s.Name.toLowerCase().contains(search.toLowerCase()) ||
+          s.StopNo.toString().contains(search)) {
         counter++;
+        Stop newStop = new Stop();
+        newStop.StopNo = s.StopNo;
+        newStop.Name = s.Name;
+        newStop.Longitude = s.Longitude;
+        newStop.Latitude = s.Latitude;
+
+        toRet.add(newStop);
 
         if (counter > 20) {
           break;
@@ -235,8 +244,14 @@ class _TransitAppState extends State<TransitApp> {
 
     for (var i = 0; i < stops.length; i++) {
       Stop stop = stops[i];
-      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmapNoText(image));
+      if (highlightedStopNo == stops[i].StopNo) {
+        bitmapFutures
+            .add(MarkerHelper.createCustomMarkerBitmapNoText(image, 110, 110));
+      } else {
+        bitmapFutures
+            .add(MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75));
 //      print("Added bus with route " + bus.RouteNo.toString());
+      }
     }
     print("Got markers list");
 
@@ -335,6 +350,34 @@ class _TransitAppState extends State<TransitApp> {
     List<Stop> stops = await future;
 
     Future<List<Marker>> markersFuture = getStopList(stops);
+    List<Marker> list = await markersFuture;
+    print("Done getting markers list");
+
+    // Sets the state to update the markers on the map
+    setState(() {
+      _markers.clear();
+      print("274");
+      for (int i = 0; i < list.length; i++) {
+        _markers[list[i].markerId.toString()] = list[i];
+        print("277");
+      }
+    });
+  }
+
+  void updateStopsForMap(double latitude1, double latitude2, double longitude1,
+      double longitude2) async {
+    _markers.clear();
+    List<Stop> validStops = [];
+    for (Stop s in listOfStops) {
+      if (s.Latitude < latitude1 &&
+          s.Latitude > latitude2 &&
+          s.Longitude < longitude1 &&
+          s.Longitude > longitude2) {
+        validStops.add(s);
+        print("ASDFHGJHREWQWDFWQQWEDFGFW");
+      }
+    }
+    Future<List<Marker>> markersFuture = getStopList(validStops);
     List<Marker> list = await markersFuture;
     print("Done getting markers list");
 
@@ -462,18 +505,20 @@ class _TransitAppState extends State<TransitApp> {
               });
             },
             onCameraIdle: () {
+              count--;
+              if (count == 0) {
+                highlightedStopNo = null;
+              }
               if (isSelected[0] == false) {
                 mapController.getZoomLevel().then((value) {
                   if (value > 15) {
                     zoomBool = false;
                     mapController.getVisibleRegion().then((value) {
-                      double lng = (value.northeast.longitude +
-                              value.southwest.longitude) /
-                          2;
-                      double lat = (value.northeast.latitude +
-                              value.southwest.latitude) /
-                          2;
-                      updateStops(lat.toString(), lng.toString());
+                      updateStopsForMap(
+                          value.northeast.latitude,
+                          value.southwest.latitude,
+                          value.northeast.longitude,
+                          value.southwest.longitude);
                     });
                   } else {
                     setState(() {
@@ -689,9 +734,12 @@ class _TransitAppState extends State<TransitApp> {
                                   text: TextSpan(children: [
                                 WidgetSpan(
                                     child: isLoading
-                                        ? Spinner(
-                                            icon: Icons.autorenew,
-                                          )
+                                        ? SizedBox(child:CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                    height:15,
+                                    width:15,)
                                         : Icon(
                                             Icons.rss_feed,
                                             size: 16,
@@ -719,67 +767,71 @@ class _TransitAppState extends State<TransitApp> {
             child: AnimatedOpacity(
               opacity: isSearching ? 1.0 : 0.0,
               duration: Duration(milliseconds: 300),
-              child: Container(
-                  decoration: BoxDecoration(
-                color: Colors.white,
-              )),
+              child: Visibility(
+                child: Container(
+                    decoration: BoxDecoration(
+                  color: Colors.white,
+                )),
+                visible: isSearching,
+              ),
             ),
           ),
           Container(
-              height: asdiufkhaiyse,
               child: TransitSearchBar<Stop>(
-                searchBarController: searchBarController,
-                hintText: "Potato",
-                shrinkWrap: true,
-                placeHolder: SizedBox.shrink(),
-                contentPadding: EdgeInsets.all(10),
-                searchBarPadding:
-                    EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-                searchBarStyle: SearchBarStyle(
-                  searchBarHeight: 45,
-                  backgroundColor: Colors.white,
-                  padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                onSearch: search,
-                onCancelled: () {
-                  FocusScope.of(context).requestFocus(FocusNode());
-                  setState(() {
-                    asdiufkhaiyse = 25.0;
-                    isSearching = false;
-                  });
+            searchBarController: searchBarController,
+            hintText: "Potato",
+            shrinkWrap: true,
+            placeHolder: SizedBox.shrink(),
+            contentPadding: EdgeInsets.all(10),
+            searchBarPadding:
+                EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            searchBarStyle: SearchBarStyle(
+              searchBarHeight: 45,
+              backgroundColor: Colors.white,
+              padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            onSearch: search,
+            onCancelled: () {
+              highlightedStopNo = null;
+              FocusScope.of(context).requestFocus(FocusNode());
+              setState(() {
+                isSearching = false;
+              });
+            },
+            onError: (error) {
+              print(error.stackTrace.toString());
+              return Text("no error");
+            },
+            emptyWidget: Align(
+              alignment: Alignment.center,
+              child: RichText(
+                  text: TextSpan(
+                      style: TextStyle(
+                          color: Colors.black87,
+                          fontStyle: FontStyle.normal,
+                          fontSize: 18),
+                      text: 'No Stops Found')),
+            ),
+            onItemFound: (Stop post, int index) {
+              print("asdfaggrrefafseghg");
+              return ListTile(
+                title: Text(post.StopNo.toString()),
+                subtitle: Text(post.Name),
+                onTap: () {
+                  searchBarController.clear();
+                  CameraPosition _kLake = CameraPosition(
+                      target: LatLng(post.Latitude, post.Longitude), zoom: 18);
+                  highlightedStopNo = post.StopNo;
+                  count = 2;
+                  updateStops(
+                      post.Latitude.toString(), post.Longitude.toString());
+                  mapController
+                      .animateCamera(CameraUpdate.newCameraPosition(_kLake));
                 },
-                onError: (error) {
-                  print(error.stackTrace.toString());
-                  return Text("no error");
-                },
-                emptyWidget: Align(
-                  alignment: Alignment.center,
-                  child: RichText(
-                      text: TextSpan(
-                          style: TextStyle(
-                              color: Colors.black87,
-                              fontStyle: FontStyle.normal,
-                              fontSize: 18),
-                          text: 'No Stops Found')),
-                ),
-                onItemFound: (Stop post, int index) {
-                  print("asdfaggrrefafseghg");
-                  return ListTile(
-                    title: Text(post.StopNo.toString()),
-                    subtitle: Text(post.Name),
-                    onTap: () {
-                      searchBarController.clear();
-                      CameraPosition _kLake = CameraPosition(
-                          target: LatLng(post.Latitude, post.Longitude),
-                          zoom: 19.151926040649414);
-
-                      mapController.animateCamera(
-                          CameraUpdate.newCameraPosition(_kLake));
-                    },
-                  );
-                },
-              )),
+              );
+            },
+          )),
         ]),
       ));
 }

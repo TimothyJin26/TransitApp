@@ -11,10 +11,11 @@ class MarkerHelper {
 
 
 
-  static Future<BitmapDescriptor> createCustomMarkerBitmapNoText(ui.Image image) async {
 
-    int width = 75;
-    int height = 75;
+  static Future<BitmapDescriptor> createCustomMarkerBitmapNoText(ui.Image image, int h, int w) async {
+
+    int width = w;
+    int height = h;
 
     ui.PictureRecorder recorder = new ui.PictureRecorder();
     Canvas c = new Canvas(recorder);
