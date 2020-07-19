@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import 'package:flutter/material.dart';
@@ -49,6 +50,8 @@ class _TransitAppState extends State<TransitApp> {
   var highlightedStopNo;
   var listOfStops = List<Stop>();
   var count = 0;
+
+  var _current = 0;
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -592,7 +595,7 @@ class _TransitAppState extends State<TransitApp> {
             ),
           ),
           DraggableScrollableSheet(
-            initialChildSize: 0.3,
+            initialChildSize: 0.2,
             minChildSize: 0.1,
             maxChildSize: 0.8,
             builder: (BuildContext context, myscrollController) {
@@ -607,98 +610,163 @@ class _TransitAppState extends State<TransitApp> {
                           opacity: nextBuses.length > 0 ? 1.0 : 0.0,
                           duration: Duration(milliseconds: 2),
                           child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(0,15,0,0),
                             controller: myscrollController,
                             itemCount: nextBuses.length,
                             itemBuilder: (BuildContext context, int index) {
                               return ListTile(
-                                  title: Column(
-                                children: <Widget>[
+                                title: Column(children: [
+                                  CarouselSlider(
+                                    options: CarouselOptions(
+                                      onPageChanged: (index, reason) {
+                                        setState(() {
+                                          _current = index;
+                                        });
+                                      },
+                                      height: 64.0,
+                                      viewportFraction: 1.0,
+                                    ),
+                                    items: [1, 2, 3, 4, 5].map((i) {
+                                      return Builder(
+                                        builder: (BuildContext context) {
+                                          return Column(
+                                            children: <Widget>[
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: <Widget>[
+                                                  Container(
+                                                    width: 60,
+                                                    margin:
+                                                        const EdgeInsets.only(
+                                                            right: 0, left: 0),
+                                                    child: Text(
+                                                      removeZeroes(
+                                                          nextBuses[index]
+                                                              .RouteNo),
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                          fontSize: 28,
+                                                          height: 1.0,
+                                                          color: Colors.black),
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: <Widget>[
+                                                        Container(
+                                                          margin:
+                                                              const EdgeInsets
+                                                                      .only(
+                                                                  left: 5),
+                                                          child: Text(
+                                                            nextBuses[index]
+                                                                .Destination,
+                                                            textAlign:
+                                                                TextAlign.left,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                              fontSize: 17,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              height: 1.0,
+                                                              color:
+                                                                  getColorFromHex(
+                                                                      '#024D7E'),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        Container(
+                                                          margin:
+                                                              const EdgeInsets
+                                                                      .only(
+                                                                  left: 5),
+                                                          child: Text(
+                                                            patternHelper(nextBuses[
+                                                                        index]
+                                                                    .Pattern) +
+                                                                " at \n" +
+                                                                nextBuses[index]
+                                                                    .nextStop
+                                                                    .toString(),
+                                                            textAlign:
+                                                                TextAlign.left,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: TextStyle(
+                                                                fontSize: 15,
+                                                                height: 1.0,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w400,
+                                                                color: Colors
+                                                                    .deepOrange),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 80,
+                                                    child: Text(
+                                                      nextBuses[index]
+                                                              .ExpectedCountdown
+                                                              .toString() +
+                                                          " min",
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                          fontSize: 22,
+                                                          height: 1.0,
+                                                          color: Colors.black),
+                                                    ),
+                                                  )
+                                                ],
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
                                   Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: <Widget>[
-                                      Container(
-                                        width: 60,
-                                        margin: const EdgeInsets.only(
-                                            right: 0, left: 0),
-                                        child: Text(
-                                          removeZeroes(
-                                              nextBuses[index].RouteNo),
-                                          textAlign: TextAlign.center,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 28,
-                                              height: 1.0,
-                                              color: Colors.black),
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [1, 2, 3, 4, 5].map((url) {
+                                      int index = [1, 2, 3, 4, 5].indexOf(url);
+                                      return Container(
+                                        width: 6.0,
+                                        height: 5.0,
+                                        margin: EdgeInsets.symmetric(
+                                            vertical: 2.0, horizontal: 2.0),
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: _current == index
+                                              ? Color.fromRGBO(0, 0, 0, 0.3)
+                                              : Color.fromRGBO(0, 0, 0, 0.15),
                                         ),
-                                      ),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: <Widget>[
-                                            Container(
-                                              margin: const EdgeInsets.only(
-                                                  left: 5),
-                                              child: Text(
-                                                nextBuses[index].Destination,
-                                                textAlign: TextAlign.left,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 17,
-                                                  fontWeight: FontWeight.w600,
-                                                  height: 1.0,
-                                                  color: getColorFromHex(
-                                                      '#024D7E'),
-                                                ),
-                                              ),
-                                            ),
-                                            Container(
-                                              margin: const EdgeInsets.only(
-                                                  left: 5),
-                                              child: Text(
-                                                patternHelper(nextBuses[index]
-                                                        .Pattern) +
-                                                    " at \n" +
-                                                    nextBuses[index]
-                                                        .nextStop
-                                                        .toString(),
-                                                textAlign: TextAlign.left,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                    fontSize: 15,
-                                                    height: 1.0,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: Colors.deepOrange),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Container(
-                                        width: 80,
-                                        child: Text(
-                                          nextBuses[index]
-                                                  .ExpectedCountdown
-                                                  .toString() +
-                                              " min",
-                                          textAlign: TextAlign.center,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                              fontSize: 22,
-                                              height: 1.0,
-                                              color: Colors.black),
-                                        ),
-                                      )
-                                    ],
+                                      );
+                                    }).toList(),
                                   ),
                                   Divider(
                                     color: Theme.of(context).primaryColor,
                                   ),
-                                ],
-                              ));
+                                ]),
+                              );
                             },
                           ),
                         ),
@@ -734,12 +802,14 @@ class _TransitAppState extends State<TransitApp> {
                                   text: TextSpan(children: [
                                 WidgetSpan(
                                     child: isLoading
-                                        ? SizedBox(child:CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      backgroundColor: Colors.orange,
-                                    ),
-                                    height:15,
-                                    width:15,)
+                                        ? SizedBox(
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              backgroundColor: Colors.orange,
+                                            ),
+                                            height: 15,
+                                            width: 15,
+                                          )
                                         : Icon(
                                             Icons.rss_feed,
                                             size: 16,
