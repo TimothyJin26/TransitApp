@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:carousel_slider/carousel_slider.dart';
@@ -40,7 +41,7 @@ class _TransitAppState extends State<TransitApp> {
   Timer timerShort;
   List<bool> isSelected = [true, false];
   List<Trip> listOfTripsThatWeCreatedJustSoWeKnowItWorks = [];
-  List<Trip> nextBuses = [];
+  List<BothDirectionRouteWithTrips> nextBuses = [];
   var timeNow = new DateTime.now();
   var timeDifference = new Duration();
   var timeLastUpdated = DateTime.now();
@@ -51,7 +52,7 @@ class _TransitAppState extends State<TransitApp> {
   var listOfStops = List<Stop>();
   var count = 0;
 
-  var _current = 0;
+  var scrollSheetDotList = [];
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
@@ -74,6 +75,14 @@ class _TransitAppState extends State<TransitApp> {
         }
         s.Name = paste[2];
         s.Longitude = double.parse(paste[5]);
+        if(paste[2].contains('@')){
+          s.OnStreet = paste[2].split('@')[0];
+          s.AtStreet = paste[2].split('@')[1];
+        } else {
+          s.OnStreet = paste[2];
+          s.AtStreet = "";
+        }
+
         s.Latitude = double.parse(paste[4]);
         listOfStops.add(s);
       }
@@ -91,21 +100,21 @@ class _TransitAppState extends State<TransitApp> {
     setState(() {
       timeDifference = timeNow.difference(timeLastUpdated);
     });
-    if (isSelected[0] == true)
-      setState(() {
-        for (String key in _markers.keys) {
-          final marker = Marker(
-              onTap: _markers[key].onTap,
-              markerId: _markers[key].markerId,
-              position: LatLng(_markers[key].position.latitude + 0.0001,
-                  _markers[key].position.longitude + 0.1),
-              infoWindow: _markers[key].infoWindow,
-              icon: _markers[key].icon);
-          _markers[key] = marker;
-          //The Great Migration
-        }
-      });
-  }
+    if (isSelected[0] == true){
+//      setState(() {
+//        for (String key in _markers.keys) {
+//          final marker = Marker(
+//              onTap: _markers[key].onTap,
+//              markerId: _markers[key].markerId,
+//              position: LatLng(_markers[key].position.latitude + 0.0001,
+//                  _markers[key].position.longitude + 0.1),
+//              infoWindow: _markers[key].infoWindow,
+//              icon: _markers[key].icon);
+//          _markers[key] = marker;
+//          //The Great Migration
+//        }
+//      });
+  }}
 
   void timerIfSelectedHelper() {
     timeLastUpdated = DateTime.now();
@@ -171,12 +180,9 @@ class _TransitAppState extends State<TransitApp> {
             });
           },
           markerId: MarkerId(bus.VehicleNo),
-          position: LatLng(bus.Latitude, bus.Longitude),
+          position: LatLng(bus.Latitude-0.00005, bus.Longitude),
           infoWindow: InfoWindow(
-            title: bus.Pattern,
-            snippet: "Last updated: " +
-                timeDifference.inSeconds.toString() +
-                "seconds ago",
+            title: patternHelper(bus.Pattern)+" to "+bus.Destination,
           ),
           icon: bitmapDescriptor);
       l.add(marker);
@@ -273,14 +279,10 @@ class _TransitAppState extends State<TransitApp> {
                   .busAtSingleStopFetcher(stop, stop.StopNo.toString());
               futureBuses.then((List<BothDirectionRouteWithTrips> value) {
                 List<BothDirectionRouteWithTrips> buses = value;
-                for (BothDirectionRouteWithTrips t in value) {
-                  int count = 0;
-                  for (Trip trip in t.Trips) {
-                    trip.RouteNo = t.RouteNo;
-                    nextBuses.add(trip);
-                    count++;
-                  }
-                }
+                updateNextBuses(value);
+                print("FDSAFDSAFDSAFDSAFDSAFDSADFDSASDF");
+
+
               });
             });
           },
@@ -288,14 +290,41 @@ class _TransitAppState extends State<TransitApp> {
           position: LatLng(stop.Latitude, stop.Longitude),
           infoWindow: InfoWindow(
             title: stop.Name.toString(),
-            snippet: stop.AtStreet,
+            snippet: stop.StopNo.toString(),
           ),
           icon: bitmapDescriptor);
       l.add(marker);
     }
     return l;
   }
-
+  void updateNextBuses(List<BothDirectionRouteWithTrips> value){
+    scrollSheetDotList.clear();
+    nextBuses.clear();
+    for(BothDirectionRouteWithTrips b in value){
+      var directionToTrip = new HashMap<String,Trip>();
+      for(Trip t in b.Trips){
+        if(directionToTrip.containsKey(t.Pattern)) {
+          if(t.ExpectedCountdown<directionToTrip[t.Pattern].ExpectedCountdown){
+            directionToTrip[t.Pattern] = t;
+          }
+        } else {
+          directionToTrip[t.Pattern] = t;
+        }
+      }
+      BothDirectionRouteWithTrips bitrip = new BothDirectionRouteWithTrips("",[]);
+      bitrip.RouteNo = b.RouteNo;
+      for(String s in directionToTrip.keys){
+        directionToTrip[s].RouteNo = b.RouteNo;
+        bitrip.Trips.add(directionToTrip[s]);
+      }
+      setState(() {
+        nextBuses.add(bitrip);
+        scrollSheetDotList.add(0);
+      });
+    }
+    print("asdfasdfadsfasdfdadfsfasdf              "+value.toString());
+    print(nextBuses.toString());
+  }
   ///
   /// Calls the Translink API and updates the bus locations on the map
   ///
@@ -316,10 +345,8 @@ class _TransitAppState extends State<TransitApp> {
     setState(() {
       isLoading = false;
       _markers.clear();
-      print("230");
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
-        print("236");
       }
     });
   }
@@ -359,10 +386,8 @@ class _TransitAppState extends State<TransitApp> {
     // Sets the state to update the markers on the map
     setState(() {
       _markers.clear();
-      print("274");
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
-        print("277");
       }
     });
   }
@@ -474,10 +499,10 @@ class _TransitAppState extends State<TransitApp> {
       Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
           .busFetcher(stops, locationData.latitude, locationData.longitude);
       List<BothDirectionRouteWithTrips> buses = await futureBuses;
-      for (BothDirectionRouteWithTrips t in buses) {
-        t.Trips[0].RouteNo = t.RouteNo;
-        nextBuses.add(t.Trips[0]);
-      }
+      scrollSheetDotList.clear();
+      print("ASDFASDFASDFASDFDASDFASDFASDFASDFASDFASDFADAF");
+      updateNextBuses(buses);
+
     }
   }
 
@@ -513,23 +538,7 @@ class _TransitAppState extends State<TransitApp> {
                 highlightedStopNo = null;
               }
               if (isSelected[0] == false) {
-                mapController.getZoomLevel().then((value) {
-                  if (value > 15) {
-                    zoomBool = false;
-                    mapController.getVisibleRegion().then((value) {
-                      updateStopsForMap(
-                          value.northeast.latitude,
-                          value.southwest.latitude,
-                          value.northeast.longitude,
-                          value.southwest.longitude);
-                    });
-                  } else {
-                    setState(() {
-                      _markers.clear();
-                      zoomBool = true;
-                    });
-                  }
-                });
+                showZoomInIfNeeded();
               }
             },
           ),
@@ -574,7 +583,11 @@ class _TransitAppState extends State<TransitApp> {
                     // Do more work (e.g. respond to the tap)
                     if (index == 0) {
                       updateBuses();
+                      setState(() {
+                        zoomBool = false;
+                      });
                     } else {
+                      showZoomInIfNeeded();
                       getLocationAndUpdateStops();
                     }
                     setState(() {
@@ -615,18 +628,20 @@ class _TransitAppState extends State<TransitApp> {
                             itemCount: nextBuses.length,
                             itemBuilder: (BuildContext context, int index) {
                               return ListTile(
+                                key: Key(nextBuses[index].RouteNo.toString()),
                                 title: Column(children: [
                                   CarouselSlider(
                                     options: CarouselOptions(
-                                      onPageChanged: (index, reason) {
+                                      onPageChanged: (carouselIndex, reason) {
+                                        print(nextBuses.length.toString()+"ASDFGHJK,M SXEDRFGTYUIK,M JHBDCERF6YH7UJKMJN HGBCFDF");
                                         setState(() {
-                                          _current = index;
+                                          scrollSheetDotList[index] = carouselIndex;
                                         });
                                       },
                                       height: 64.0,
                                       viewportFraction: 1.0,
                                     ),
-                                    items: [1, 2, 3, 4, 5].map((i) {
+                                    items: nextBuses[index].Trips.map((i) {
                                       return Builder(
                                         builder: (BuildContext context) {
                                           return Column(
@@ -669,8 +684,7 @@ class _TransitAppState extends State<TransitApp> {
                                                                       .only(
                                                                   left: 5),
                                                           child: Text(
-                                                            nextBuses[index]
-                                                                .Destination,
+                                                            nextBuses[index].Trips[scrollSheetDotList[index]].Destination,
                                                             textAlign:
                                                                 TextAlign.left,
                                                             overflow:
@@ -694,11 +708,10 @@ class _TransitAppState extends State<TransitApp> {
                                                                       .only(
                                                                   left: 5),
                                                           child: Text(
-                                                            patternHelper(nextBuses[
-                                                                        index]
+                                                            patternHelper(nextBuses[index].Trips[scrollSheetDotList[index]]
                                                                     .Pattern) +
                                                                 " at \n" +
-                                                                nextBuses[index]
+                                                                nextBuses[index].Trips[scrollSheetDotList[index]]
                                                                     .nextStop
                                                                     .toString(),
                                                             textAlign:
@@ -722,7 +735,7 @@ class _TransitAppState extends State<TransitApp> {
                                                   Container(
                                                     width: 80,
                                                     child: Text(
-                                                      nextBuses[index]
+                                                      nextBuses[index].Trips[scrollSheetDotList[index]] 
                                                               .ExpectedCountdown
                                                               .toString() +
                                                           " min",
@@ -746,8 +759,8 @@ class _TransitAppState extends State<TransitApp> {
                                   ),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [1, 2, 3, 4, 5].map((url) {
-                                      int index = [1, 2, 3, 4, 5].indexOf(url);
+                                    children:  nextBuses[index].Trips.asMap().entries.map((url) {
+                                      int itemIndex = url.key;
                                       return Container(
                                         width: 6.0,
                                         height: 5.0,
@@ -755,7 +768,7 @@ class _TransitAppState extends State<TransitApp> {
                                             vertical: 2.0, horizontal: 2.0),
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: _current == index
+                                          color: scrollSheetDotList[index] ==  itemIndex
                                               ? Color.fromRGBO(0, 0, 0, 0.3)
                                               : Color.fromRGBO(0, 0, 0, 0.15),
                                         ),
@@ -849,7 +862,7 @@ class _TransitAppState extends State<TransitApp> {
           Container(
               child: TransitSearchBar<Stop>(
             searchBarController: searchBarController,
-            hintText: "Potato",
+            hintText: "Potatoe",
             shrinkWrap: true,
             placeHolder: SizedBox.shrink(),
             contentPadding: EdgeInsets.all(10),
@@ -904,6 +917,26 @@ class _TransitAppState extends State<TransitApp> {
           )),
         ]),
       ));
+
+  void showZoomInIfNeeded() {
+    mapController.getZoomLevel().then((value) {
+      if (value > 15) {
+        zoomBool = false;
+        mapController.getVisibleRegion().then((value) {
+          updateStopsForMap(
+              value.northeast.latitude,
+              value.southwest.latitude,
+              value.northeast.longitude,
+              value.southwest.longitude);
+        });
+      } else {
+        setState(() {
+          _markers.clear();
+          zoomBool = true;
+        });
+      }
+    });
+  }
 }
 
 ///

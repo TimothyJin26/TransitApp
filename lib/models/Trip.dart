@@ -9,7 +9,7 @@ part 'Trip.g.dart';
 
 
 @JsonSerializable()
-class Trip {
+class  Trip {
    String nextStop;
    String Pattern;
    String Destination;
