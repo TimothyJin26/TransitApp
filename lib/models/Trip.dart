@@ -16,6 +16,8 @@ class  Trip {
    int ExpectedCountdown;
    String LastUpdate;
    String RouteNo;
+   String StopNo;
+   String ExpectedLeaveTime;
 
 
  // Trip(String Pattern, String Destination, int ExpectedCount, String LastUpdate){
@@ -30,6 +32,7 @@ class  Trip {
     this.ExpectedCountdown,
     this.LastUpdate,
     this.RouteNo,
+    this.ExpectedLeaveTime,
 
   });
 

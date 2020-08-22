@@ -32,7 +32,13 @@ class BusAtSingleStopFetcher {
         SingleDirectionRouteWithTrips greatFamine =
             SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
         for (Trip t in greatFamine.Schedules) {
-          t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
+          if (stop.AtStreet == null||stop.OnStreet == null) {
+            t.nextStop = stop.Name;
+            t.StopNo = stop.StopNo.toString();
+          } else{
+            t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
+            t.StopNo = stop.StopNo.toString();
+          }
         }
 
         List<String> list = new List<String>();
