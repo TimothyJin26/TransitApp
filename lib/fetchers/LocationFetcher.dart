@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -8,7 +9,6 @@ import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/fetchers/StopFetcher.dart';
 
 class LocationFetcher {
-
   /**
    * Fetches the locations of all active buses
    */
@@ -19,33 +19,34 @@ class LocationFetcher {
     Map<String, String> requestHeaders = {
       'Accept': 'application/json',
     };
+    try {
+      // Retrieve the locations of bus locations
+      final response = await http.get(busLocationsURL, headers: requestHeaders);
 
-    // Retrieve the locations of bus locations
-    final response = await http.get(busLocationsURL, headers: requestHeaders);
-
-    if (response.statusCode == 200) {
-      print("Finished fetching all buses");
-      List<dynamic> jsonBuses = (json.decode(response.body) as List);
-      List<Bus> buses = [];
-      print("Total buses = " + jsonBuses.length.toString());
-      for (int i = 0; i < jsonBuses.length; i++) {
-        Bus irishpotato = Bus.fromJson(jsonBuses[i]);
-        while(irishpotato.RouteNo.startsWith("0")){
-          irishpotato.RouteNo =irishpotato.RouteNo.substring(1);
-
+      if (response.statusCode == 200) {
+        print("Finished fetching all buses");
+        List<dynamic> jsonBuses = (json.decode(response.body) as List);
+        List<Bus> buses = [];
+        print("Total buses = " + jsonBuses.length.toString());
+        for (int i = 0; i < jsonBuses.length; i++) {
+          Bus irishpotato = Bus.fromJson(jsonBuses[i]);
+          while (irishpotato.RouteNo.startsWith("0")) {
+            irishpotato.RouteNo = irishpotato.RouteNo.substring(1);
+          }
+          buses.add(irishpotato);
         }
-        buses.add(irishpotato);
-      }
-      print("Finished parsing all buses");
+        print("Finished parsing all buses");
 
-      return buses;
-    } else if(response.statusCode==404) {
-      List<Bus> buses = [];
-      return buses;
-    }else {
-      throw HttpException(
-          'Unexpected status code ${response.statusCode}:'         ' ${response.reasonPhrase}',
-          uri: Uri.parse(busLocationsURL));
+        return buses;
+      } else if (response.statusCode == 404) {
+        List<Bus> buses = [];
+        return buses;
+      } else {
+        return [];
+      }
+    } on TimeoutException catch (e) {
+      print("TimeoutException");
+      return [];
     }
     // TODO
   }
@@ -53,7 +54,8 @@ class LocationFetcher {
   /**
    * Fetches the buses for a bus stop given a lat and lng
    */
-  Future<List<Bus>> busFetcherBasedOnLocation(String latitude, String longitude) async {
+  Future<List<Bus>> busFetcherBasedOnLocation(
+      String latitude, String longitude) async {
     List<Bus> globalListofBuses = new List<Bus>();
     StopFetcher stopFetcher = new StopFetcher();
     List<Stop> listOfStops = await stopFetcher.stopFetcher(latitude, longitude);
@@ -71,33 +73,38 @@ class LocationFetcher {
    * Fetches the buses for a bus stop given a bus stop number
    */
   Future<List<Bus>> busFetcher(String busStopNum) async {
-    String busLocationsURL =
-        'https://api.translink.ca/rttiapi/v1/buses?apikey=i9U837R3QcSl2OhZpJm0&stopNo=' +
-            busStopNum;
-    Map<String, String> requestHeaders = {
-      'Accept': 'application/json',
-    };
+    try {
+      String busLocationsURL =
+          'https://api.translink.ca/rttiapi/v1/buses?apikey=i9U837R3QcSl2OhZpJm0&stopNo=' +
+              busStopNum;
+      Map<String, String> requestHeaders = {
+        'Accept': 'application/json',
+      };
 
-    // Retrieve the locations of bus locations
-    final response = await http.get(busLocationsURL, headers: requestHeaders);
+      // Retrieve the locations of bus locations
+      final response = await http.get(busLocationsURL, headers: requestHeaders);
 
-    if (response.statusCode == 200) {
-      List<dynamic> jsonBuses = (json.decode(response.body) as List);
-      List<Bus> buses = [];
-      for (int i = 0; i < jsonBuses.length; i++) {
-        Bus irishpotato = Bus.fromJson(jsonBuses[i]);
-        buses.add(irishpotato);
+      if (response.statusCode == 200) {
+        List<dynamic> jsonBuses = (json.decode(response.body) as List);
+        List<Bus> buses = [];
+        for (int i = 0; i < jsonBuses.length; i++) {
+          Bus irishpotato = Bus.fromJson(jsonBuses[i]);
+          buses.add(irishpotato);
+        }
+
+        return buses;
+      } else if (response.statusCode == 404) {
+        List<Bus> buses = [];
+        return buses;
+      } else {
+        throw HttpException(
+            'Unexpected status code ${response.statusCode}:'
+            ' ${response.reasonPhrase}',
+            uri: Uri.parse(busLocationsURL));
       }
-
-      return buses;
-    } else if(response.statusCode==404) {
-      List<Bus> buses = [];
-      return buses;
-    }else {
-      throw HttpException(
-          'Unexpected status code ${response.statusCode}:'
-          ' ${response.reasonPhrase}',
-          uri: Uri.parse(busLocationsURL));
+    } on TimeoutException catch (e) {
+      print("TimeoutException");
+      return [];
     }
   }
 }

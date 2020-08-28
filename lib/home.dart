@@ -1,19 +1,25 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:ads/ads.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:connectivity/connectivity.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_beautiful_popup/main.dart';
 import 'dart:ui' as ui;
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:firebase_admob/firebase_admob.dart';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
-import 'package:location/location.dart';
+
+//import 'package:location/location.dart';
 import 'package:transitapp/popuptemplates/MyTemplate.dart';
 import 'package:transitapp/searchbar/searchBar.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
@@ -50,6 +56,7 @@ class _TransitAppState extends State<TransitApp> {
   var timeNow = new DateTime.now();
   var timeDifference = new Duration();
   var timeLastUpdated = DateTime.now();
+  var timeLastUpdatedForInit = null;
   var isLoading = true;
   var zoomBool = false;
   var isSearching = false;
@@ -57,55 +64,124 @@ class _TransitAppState extends State<TransitApp> {
   var listOfStops = List<Stop>();
   var count = 0;
   var scrollsheetText = "Searching For Buses...";
-  var isLocationEnabled = false;
-
+  var isLocationEnabled = true;
   var scrollSheetDotList = [];
+  var tappedIntoStop = false;
+  Position userLocation = null;
+  List<BothDirectionRouteWithTrips> nextBusesCopy = null;
+
+  Ads appAds;
+
+  final String appId = Platform.isAndroid
+      ? 'ca-app-pub-6078575452513504~1720853236'
+      : 'ca-app-pub-6078575452513504~1720853236';
+
+  final String bannerUnitId = Platform.isAndroid
+      ? 'ca-app-pub-3940256099942544/6300978111'
+
+//      ? 'ca-app-pub-6078575452513504/9492188580'
+      : 'ca-app-pub-6078575452513504/5469183098';
+
+  StreamSubscription<ConnectivityResult> subscription;
+  StreamSubscription<Position> positionStream;
 
   void vibrate() async {
     bool canVibrate = await Vibrate.canVibrate;
     canVibrate ? Vibrate.feedback(FeedbackType.medium) : null;
   }
 
+  Future<Position> getLocation() async {
+    if(userLocation!=null){
+      return userLocation;
+    } else {
+      Geolocator location = new Geolocator();
+      return location.getCurrentPosition();
+    }
+  }
+
   void initWithLocation() {
-    print("Started initWithLocation");
-    Location location = new Location();
-    LocationData locationData;
-    location.getLocation().then((value) {
-      print("Found initWithLocation success");
-      locationData = value;
-      setState(() {
-        isLocationEnabled = true;
-      });
-      print('Found location: ' +
-          locationData.latitude.toString() +
-          ', ' +
-          locationData.longitude.toString());
-
-      // TODO: Update the markers on a regular basis
-      //isSelected[0] == false
-      if (isSelected[0] == false) {
-        print("497");
-        //updateStops renders stops
-        updateStops(locationData.latitude.toString(),
+    if (timeLastUpdatedForInit == null ||
+        new DateTime.now().difference(timeLastUpdatedForInit).inSeconds > 5) {
+      timeLastUpdatedForInit = DateTime.now();
+      print("Started initWithLocation");
+//      Location location = new Location();
+//      LocationData locationData;
+//      location.getLocation().then((value) {
+        getLocation().then((locationData) {
+        print("Found initWithLocation success");
+        setState(() {
+          isLocationEnabled = true;
+        });
+        print('Found location: ' +
+            locationData.latitude.toString() +
+            ', ' +
             locationData.longitude.toString());
-      } else {
-        updateBuses();
 
-        // render the next buses on scrollsheet
-        updateNextBusesForAllNearbyStops();
-      }
-    }).catchError((onError) {
-      print("Found initWithLocation error");
-      print(onError.toString());
-      setState(() {
-        isLocationEnabled = false;
-        scrollsheetText = "Location Services Disabled";
+        // TODO: Update the markers on a regular basis
+        //isSelected[0] == false
+        if (isSelected[0] == false) {
+          print("Starting by updating stops");
+          //updateStops renders stops
+          updateStops(locationData.latitude.toString(),
+              locationData.longitude.toString());
+        } else {
+          print("Starting by updating buses");
+          updateBuses();
+
+          // render the next buses on scrollsheet
+          updateNextBusesForAllNearbyStops();
+        }
+      }).catchError((onError) {
+        print("Found initWithLocation error");
+        print(onError.toString());
+        setState(() {
+          isLocationEnabled = false;
+          scrollsheetText = "Location Services Disabled";
+        });
       });
-    });
+    } else {
+      print("Updated too frequently");
+    }
   }
 
   @override
   void initState() {
+    super.initState();
+
+    var geolocator = Geolocator();
+    var locationOptions = LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 10);
+
+    positionStream = geolocator.getPositionStream(locationOptions).listen(
+            (Position position) {
+              userLocation = position;
+              print("LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED ");
+        });
+
+    appAds = Ads(
+      appId,
+      bannerUnitId: bannerUnitId,
+        size: AdSize.banner,
+//      screenUnitId: screenUnitId,
+//      keywords: <String>['ibm', 'computers'],
+//      contentUrl: 'http://www.ibm.com',
+//      childDirected: false,
+//      testDevices: ['Samsung_Galaxy_SII_API_26:5554'],
+      testing: true,
+    );
+
+
+
+
+    appAds.showBannerAd();
+
+
+
+
+
+
+
+
+
     //Location stuff moved from onMapCreated
 
 //   catch (e) {
@@ -143,7 +219,7 @@ class _TransitAppState extends State<TransitApp> {
       }
     });
 
-    super.initState();
+
 
     // Updates the bus locations every 30 seconds
     timer = Timer.periodic(
@@ -168,14 +244,45 @@ class _TransitAppState extends State<TransitApp> {
               // Updates the countdown clock every 2 seconds
               timerShort = Timer.periodic(Duration(seconds: 2),
                   (Timer t) => timerIfSelectedHelperShort());
+
+              subscription?.resume();
+              positionStream?.resume();
+
+              initWithLocation();
             }),
         suspendingCallBack: () async => setState(() {
               print(
                   "TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED ");
-              timer.cancel();
-              timerShort.cancel();
+              timer?.cancel();
+              timerShort?.cancel();
+              subscription?.pause();
+              positionStream?.pause();
             })));
-    initWithLocation();
+
+    Connectivity().checkConnectivity().then((connectivityResult) {
+      if (connectivityResult == ConnectivityResult.none) {
+        setState(() {
+          scrollsheetText = "No Internet Connection";
+        });
+
+        // Listen for connectivity changes, in case user gets internet later
+        subscription = Connectivity()
+            .onConnectivityChanged
+            .listen((ConnectivityResult result) {
+          if (result != ConnectivityResult.none) {
+            print("Connectivity changed - found connection");
+            initWithLocation();
+            _currentLocation();
+          } else {
+            scrollsheetText = "No Internet Connection";
+          }
+        });
+      } else {
+        print("Connectivity available - found connection");
+        initWithLocation();
+      }
+      // I am connected to a wifi network.
+    });
   }
 
   void timerIfSelectedHelperShort() {
@@ -201,6 +308,9 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void timerIfSelectedHelper() {
+    if(!tappedIntoStop) {
+      updateNextBusesForAllNearbyStops();
+    }
     timeLastUpdated = DateTime.now();
     if (isSelected[0] == true) {
       updateBuses();
@@ -209,6 +319,8 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void dispose() {
+    subscription?.cancel();
+    positionStream?.cancel();
     timer?.cancel();
     timerShort?.cancel();
     super.dispose();
@@ -248,6 +360,7 @@ class _TransitAppState extends State<TransitApp> {
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
 
       final marker = Marker(
+        //Bus Marker
           onTap: () {
 //            mapController.showMarkerInfoWindow(MarkerId(bus.VehicleNo));
             setState(() {
@@ -352,9 +465,13 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
+        //Stop Marker
           onTap: () {
             // On Tap stop marker, update the next buses
             setState(() {
+              tappedIntoStop = true;
+              nextBusesCopy = nextBuses;
+              count = 2;
               print("291");
               BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
               Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
@@ -380,15 +497,18 @@ class _TransitAppState extends State<TransitApp> {
   /// Renders scrollable scrollsheet
   void updateNextBusesForAllNearbyStops() async {
     print("somewhere at the start");
-    Location location = new Location();
-    LocationData locationData;
+//    Location location = new Location();
+//    LocationData locationData;
+    Position locationData;
     try {
-      locationData = await location.getLocation();
+//      locationData = await location.getLocation();
+       locationData = await getLocation();
       setState(() {
         isLocationEnabled = true;
         scrollsheetText = "Searching For Buses...";
       });
     } catch (e) {
+      print("User did not grant location permissions");
       setState(() {
         isLocationEnabled = false;
         scrollsheetText = "Location Services Disabled";
@@ -420,6 +540,12 @@ class _TransitAppState extends State<TransitApp> {
   void renderListOfNextBuses(List<BothDirectionRouteWithTrips> buses) async {
     scrollSheetDotList.clear();
     nextBuses.clear();
+    if(buses.length==0){
+      setState(() {
+        scrollsheetText = "No Buses Found";
+      });
+      return;
+    }
     for (BothDirectionRouteWithTrips b in buses) {
       var directionToTrip = new HashMap<String, Trip>();
       for (Trip t in b.Trips) {
@@ -475,10 +601,12 @@ class _TransitAppState extends State<TransitApp> {
   /// Fetches location and calls Translink API and updates bus stops on map
   ///
   void getLocationAndUpdateStops() async {
-    Location location = new Location();
-    LocationData locationData;
+//    Location location = new Location();
+//    LocationData locationData;
+    Position locationData;
     try {
-      locationData = await location.getLocation();
+//      locationData = await location.getLocation();
+      locationData = await getLocation();
       setState(() {
         isLocationEnabled = true;
         scrollsheetText = "Searching For Buses...";
@@ -587,14 +715,17 @@ class _TransitAppState extends State<TransitApp> {
 
   void _currentLocation() async {
     final GoogleMapController controller = mapController;
-    LocationData currentLocation;
-    var location = new Location();
+    Position currentLocation;
+    tappedIntoStop = false;
+    var location = new Geolocator();
+//    LocationData currentLocation;
+//    var location = new Location();
     try {
       setState(() {
         isLocationEnabled = true;
-        scrollsheetText = "Searching For Buses...";
       });
-      currentLocation = await location.getLocation();
+//      currentLocation = await location.getLocation();
+      currentLocation = await location.getCurrentPosition();
       controller.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
           bearing: 0,
@@ -629,19 +760,30 @@ class _TransitAppState extends State<TransitApp> {
             ),
             polylines: Set<Polyline>.of(_mapPolylines.values),
             markers: _markers.values.toSet(),
+            //google map
             onTap: (LatLng a) {
               setState(() {
+                if(nextBusesCopy != null){
+                 nextBuses = nextBusesCopy;
+                }
                 if (isSelected[1] == true) {}
                 _mapPolylines.clear();
               });
             },
             onCameraIdle: () {
+              setState(() {
+                if(nextBusesCopy!=null){
+                  nextBuses = nextBusesCopy;
+                }
+              });
               count--;
-              if (count == 0) {
+              print("ON MAP MOVE with count = " + count.toString());
+              if (count <= 0) {
+                // moved into if statement to prevent on camera idle code on tap stop
                 highlightedStopNo = null;
-              }
-              if (isSelected[0] == false) {
-                showZoomInIfNeeded();
+                if (isSelected[0] == false) {
+                  showZoomInIfNeeded();
+                }
               }
             },
           ),
@@ -660,18 +802,18 @@ class _TransitAppState extends State<TransitApp> {
           ),
           Positioned(
             top: 100,
-            right: 15,
-            left: 15,
+            right: 7,
+            left: 7,
             child: Align(
               alignment: Alignment.topRight,
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: getColorFromHex('cfd1d4'),
                   border: Border.all(color: Colors.black, width: 1.0),
                   borderRadius: BorderRadius.all(Radius.circular(10)),
                 ),
                 child: ToggleButtons(
-                  fillColor: Colors.white,
+                  fillColor: getColorFromHex('e8eaed'),
                   disabledColor: Colors.red,
                   borderRadius: BorderRadius.circular(10),
                   children: <Widget>[
@@ -713,8 +855,8 @@ class _TransitAppState extends State<TransitApp> {
           ),
           Positioned(
             top: 158,
-            right: 15,
-            left: 15,
+            right: 7,
+            left: 7,
             child: Align(
               alignment: Alignment.bottomRight,
               child: Container(
@@ -737,7 +879,7 @@ class _TransitAppState extends State<TransitApp> {
             ),
           ),
           DraggableScrollableSheet(
-            initialChildSize: 0.2,
+            initialChildSize: 0.4,
             minChildSize: 0.1,
             maxChildSize: 0.8,
             builder: (BuildContext context, myscrollController) {
@@ -746,7 +888,7 @@ class _TransitAppState extends State<TransitApp> {
                   child: Stack(children: [
                     Container(
                       margin: const EdgeInsets.fromLTRB(0.0, 27.0, 0.0, 0.0),
-                      color: Colors.white,
+                      color: getColorFromHex('e8eaed').withOpacity(0.99),
                       child: Stack(children: [
                         AnimatedOpacity(
                           opacity: nextBuses.length > 0 ? 1.0 : 0.0,
@@ -812,6 +954,9 @@ class _TransitAppState extends State<TransitApp> {
                                                     actions: [
                                                       popup.button(
                                                         label: 'Close',
+                                                        onPressed: () {
+                                                          Navigator.of(context).pop();
+                                                        }
                                                       ),
                                                     ],
                                                   );
@@ -841,7 +986,7 @@ class _TransitAppState extends State<TransitApp> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                           style: TextStyle(
-                                                            fontSize: 50,
+                                                            fontSize: removeZeroes(nextBuses[index].RouteNo).length<3? 50:35,
                                                             height: 1.0,
                                                             fontWeight:
                                                                 FontWeight.w700,
@@ -915,7 +1060,7 @@ class _TransitAppState extends State<TransitApp> {
                                                                     height: 1.0,
                                                                     fontWeight:
                                                                         FontWeight
-                                                                            .w600,
+                                                                            .w400,
                                                                     color: Colors
                                                                         .deepOrange),
                                                               ),
@@ -940,7 +1085,7 @@ class _TransitAppState extends State<TransitApp> {
                                                           style: TextStyle(
                                                             fontSize: 25,
                                                             fontWeight:
-                                                                FontWeight.w600,
+                                                                FontWeight.w700,
                                                             height: 1.0,
                                                             color:
                                                                 getColorFromHex(
@@ -1096,15 +1241,15 @@ class _TransitAppState extends State<TransitApp> {
           Container(
               child: TransitSearchBar<Stop>(
             searchBarController: searchBarController,
-            hintText: "Search stops",
+            hintText: "Search for stops",
             shrinkWrap: true,
             placeHolder: SizedBox.shrink(),
-            contentPadding: EdgeInsets.all(10),
+            contentPadding: EdgeInsets.all(7),
             searchBarPadding:
                 EdgeInsets.symmetric(horizontal: 10, vertical: 15),
             searchBarStyle: SearchBarStyle(
               searchBarHeight: 45,
-              backgroundColor: Colors.white,
+              backgroundColor: getColorFromHex('e8eaed'),
               padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
               borderRadius: BorderRadius.circular(10),
             ),
@@ -1136,6 +1281,7 @@ class _TransitAppState extends State<TransitApp> {
                 subtitle: Text(post.Name),
                 onTap: () {
                   setState(() {
+                    nextBusesCopy = nextBuses;
                     isSelected = [false, true];
                     BusAtSingleStopFetcher busFetcher =
                         new BusAtSingleStopFetcher();

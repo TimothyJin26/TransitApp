@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
@@ -17,26 +18,32 @@ class NextBusesForRouteAtStop {
     Map<String, String> requestHeaders = {
       'Accept': 'application/json',
     };
+    try {
+      final response = await http.get(
+          stopLocationsURL, headers: requestHeaders);
 
-    final response = await http.get(stopLocationsURL, headers: requestHeaders);
-
-    if (response.statusCode == 200) {
-      List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
+      if (response.statusCode == 200) {
+        List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
 //        List<RouteID> routeIDs = [];
 
-      for (int i = 0; i < listOfTripsJson.length; i++) {
-        SingleDirectionRouteWithTrips greatFamine =
-        SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
-        routeTrips=(greatFamine.Schedules);
+        for (int i = 0; i < listOfTripsJson.length; i++) {
+          SingleDirectionRouteWithTrips greatFamine =
+          SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
+          routeTrips = (greatFamine.Schedules);
 //          routeIDs.add(greatFamine);
+        }
+      } else {
+        throw HttpException(
+            'Unexpected status code ${response.statusCode}:'
+                ' ${response.reasonPhrase}',
+            uri: Uri.parse(stopLocationsURL));
       }
-    } else {
-      throw HttpException(
-          'Unexpected status code ${response.statusCode}:'
-              ' ${response.reasonPhrase}',
-          uri: Uri.parse(stopLocationsURL));
+      routeTrips.sort((a, b) =>
+          a.ExpectedCountdown.compareTo(b.ExpectedCountdown));
+      return routeTrips;
+    }on TimeoutException catch (e) {
+      print("TimeoutException");
+      return [];
     }
-    routeTrips.sort((a,b) => a.ExpectedCountdown.compareTo(b.ExpectedCountdown));
-    return routeTrips;
   }
 }

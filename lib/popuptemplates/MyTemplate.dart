@@ -4,6 +4,8 @@ import 'package:transitapp/fetchers/NextBusesForRouteAtStop.dart';
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Trip.dart';
 
+import '../home.dart';
+
 class MyTemplate extends BeautifulPopupTemplate {
   final BeautifulPopup options;
   MyTemplate(this.options, this.routeNo, this.pattern, this.stopNo, this.trips) : super(options);
@@ -45,7 +47,7 @@ class MyTemplate extends BeautifulPopupTemplate {
         child: Container(
           decoration: new BoxDecoration(
             borderRadius: new BorderRadius.circular(16.0),
-            color: Colors.blueAccent,
+            color: getColorFromHex('#0d2036'),
           ),
         ),
       ),
@@ -58,7 +60,7 @@ class MyTemplate extends BeautifulPopupTemplate {
           text: TextSpan(
             text: routeNo,
             style: TextStyle(
-              color: Colors.black,
+              color: Colors.white70,
               fontWeight: FontWeight.w800,
               fontSize: 100,
             )
@@ -75,7 +77,7 @@ class MyTemplate extends BeautifulPopupTemplate {
           text: TextSpan(
               text: pattern,
               style: TextStyle(
-                color: Colors.black,
+                color: Colors.white54,
                 fontWeight: FontWeight.w800,
                 fontSize: 25,
               )
@@ -85,7 +87,7 @@ class MyTemplate extends BeautifulPopupTemplate {
       ),
       Positioned(
         top: percentH(35),
-        bottom: percentH(10),
+        bottom: percentH(9.4),
         left: percentW(2),
         right: percentW(2),
         child: ListView.builder(
@@ -101,7 +103,7 @@ class MyTemplate extends BeautifulPopupTemplate {
                       text: TextSpan(
                           text: timeFormatter(trips[index].ExpectedLeaveTime),
                           style: TextStyle(
-                            color: Colors.black,
+                            color: Colors.white,
                             fontWeight: FontWeight.w800,
                             fontSize: 25,
                           )
@@ -118,7 +120,7 @@ class MyTemplate extends BeautifulPopupTemplate {
                       text: TextSpan(
                           text: "TO "+trips[index].Destination,
                           style: TextStyle(
-                            color: Colors.black,
+                            color: Colors.white,
                             fontWeight: FontWeight.w500,
                             fontSize: 20,
                           )
@@ -132,6 +134,12 @@ class MyTemplate extends BeautifulPopupTemplate {
             );
           },
         ),
+      ),
+      Positioned(
+        bottom: percentW(1),
+        left: percentW(5),
+        right: percentW(5),
+        child: actions ?? Container(),
       ),
 
     ];

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
@@ -22,46 +23,51 @@ class BusAtSingleStopFetcher {
       'Accept': 'application/json',
     };
 
-    final response = await http.get(stopLocationsURL, headers: requestHeaders);
+    try {
+      final response = await http
+          .get(stopLocationsURL, headers: requestHeaders)
+          .timeout(Duration(seconds: 3));
 
-    if (response.statusCode == 200) {
-      List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
+      if (response.statusCode == 200) {
+        List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
 //        List<RouteID> routeIDs = [];
 
-      for (int i = 0; i < listOfTripsJson.length; i++) {
-        SingleDirectionRouteWithTrips greatFamine =
-            SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
-        for (Trip t in greatFamine.Schedules) {
-          if (stop.AtStreet == null||stop.OnStreet == null) {
-            t.nextStop = stop.Name;
-            t.StopNo = stop.StopNo.toString();
-          } else{
-            t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
-            t.StopNo = stop.StopNo.toString();
-          }
-        }
-
-        List<String> list = new List<String>();
-        for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-          list.add(routeTrip.RouteNo);
-        }
-        if (!list.contains(greatFamine.RouteNo)) {
-          routeTrips.add(new BothDirectionRouteWithTrips(
-              greatFamine.RouteNo, greatFamine.Schedules));
-        } else {
-          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-            if (routeTrip.RouteNo == greatFamine.RouteNo) {
-              routeTrip.Trips.addAll(greatFamine.Schedules);
+        for (int i = 0; i < listOfTripsJson.length; i++) {
+          SingleDirectionRouteWithTrips greatFamine =
+              SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
+          for (Trip t in greatFamine.Schedules) {
+            if (stop.AtStreet == null || stop.OnStreet == null) {
+              t.nextStop = stop.Name;
+              t.StopNo = stop.StopNo.toString();
+            } else {
+              t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
+              t.StopNo = stop.StopNo.toString();
             }
           }
-        }
+
+          List<String> list = new List<String>();
+          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
+            list.add(routeTrip.RouteNo);
+          }
+          if (!list.contains(greatFamine.RouteNo)) {
+            routeTrips.add(new BothDirectionRouteWithTrips(
+                greatFamine.RouteNo, greatFamine.Schedules));
+          } else {
+            for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
+              if (routeTrip.RouteNo == greatFamine.RouteNo) {
+                routeTrip.Trips.addAll(greatFamine.Schedules);
+              }
+            }
+          }
 //          routeIDs.add(greatFamine);
+        }
+      } else {
+        print("else");
+        return [];
       }
-    } else {
-      throw HttpException(
-          'Unexpected status code ${response.statusCode}:'
-          ' ${response.reasonPhrase}',
-          uri: Uri.parse(stopLocationsURL));
+    } on TimeoutException catch (e) {
+      print("TimeoutException");
+      return [];
     }
 
     return routeTrips;

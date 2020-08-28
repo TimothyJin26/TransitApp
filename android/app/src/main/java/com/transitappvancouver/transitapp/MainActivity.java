@@ -1,4 +1,4 @@
-package kinetiqa.com.transitapp;
+package com.transitappvancouver.transitapp;
 
 import android.os.Bundle;
 import io.flutter.app.FlutterActivity;

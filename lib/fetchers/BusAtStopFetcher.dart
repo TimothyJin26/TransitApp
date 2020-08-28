@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
@@ -31,6 +32,9 @@ class BusAtStopFetcher {
     shortestDistance = stopList.sublist(0, 8);
     //  Go through every stop to fetch the next buses
     print("thirty one (31) trente et un (31)" + stopList.toString());
+
+    List<Future<Response>> futures = [];
+
     for (Stop stop in shortestDistance) {
       String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/' +
           stop.StopNo.toString() +
@@ -39,9 +43,11 @@ class BusAtStopFetcher {
         'Accept': 'application/json',
       };
 
-      final response =
-          await http.get(stopLocationsURL, headers: requestHeaders);
-
+      futures.add(http.get(stopLocationsURL, headers: requestHeaders));
+    }
+    var counter = 0;
+    for(Future<Response> r in futures) {
+      Response response = await r;
       if (response.statusCode == 200) {
         List<dynamic> jsonStops = (json.decode(response.body) as List);
         for (int i = 0; i < jsonStops.length; i++) {
@@ -50,12 +56,12 @@ class BusAtStopFetcher {
               SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
           print(routeObjects.Schedules.toString());
           for (Trip t in routeObjects.Schedules) {
-            if (stop.AtStreet == null||stop.OnStreet == null) {
-              t.nextStop = stop.Name;
-              t.StopNo = stop.StopNo.toString();
+            if (shortestDistance[counter].AtStreet == null||shortestDistance[counter].OnStreet == null) {
+              t.nextStop = shortestDistance[counter].Name;
+              t.StopNo = shortestDistance[counter].StopNo.toString();
             } else{
-              t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
-              t.StopNo = stop.StopNo.toString();
+              t.nextStop = shortestDistance[counter].AtStreet + " and \n" + shortestDistance[counter].OnStreet;
+              t.StopNo = shortestDistance[counter].StopNo.toString();
             }
           }
 
@@ -77,12 +83,11 @@ class BusAtStopFetcher {
           }
         }
       } else {
-        throw HttpException(
-            'Unexpected status code ${response.statusCode}:'
-            ' ${response.reasonPhrase}',
-            uri: Uri.parse(stopLocationsURL));
+        print("Could not get info for stop " + shortestDistance[counter].StopNo.toString());
       }
+      counter++;
     }
+
     print(DateTime.now().toString() + " END OF BUS FETCHER");
     return routeTrips;
   }
