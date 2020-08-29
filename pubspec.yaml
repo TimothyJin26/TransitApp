@@ -37,7 +37,7 @@ dependencies:
       ref: master
   geolocator: ^5.3.2+2
   archive: 2.0.13
-  vibrate: ^0.0.4
+  vibration: 1.4.0
   #location: 3.0.2
   flutter:
     sdk: flutter

@@ -24,7 +24,7 @@ import 'package:transitapp/popuptemplates/MyTemplate.dart';
 import 'package:transitapp/searchbar/searchBar.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
-import 'package:vibrate/vibrate.dart';
+import 'package:vibration/vibration.dart';
 
 import 'Util.dart';
 import 'fetchers/BusAtStopFetcher.dart';
@@ -69,6 +69,8 @@ class _TransitAppState extends State<TransitApp> {
   var tappedIntoStop = false;
   Position userLocation = null;
   List<BothDirectionRouteWithTrips> nextBusesCopy = null;
+  List scrollSheetDotListCopy = null;
+
 
   Ads appAds;
 
@@ -77,17 +79,21 @@ class _TransitAppState extends State<TransitApp> {
       : 'ca-app-pub-6078575452513504~1720853236';
 
   final String bannerUnitId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111'
-
-//      ? 'ca-app-pub-6078575452513504/9492188580'
+  //test
+//      ? 'ca-app-pub-3940256099942544/6300978111'
+  //real
+      ? 'ca-app-pub-6078575452513504/9492188580'
+  //ios
       : 'ca-app-pub-6078575452513504/5469183098';
 
   StreamSubscription<ConnectivityResult> subscription;
   StreamSubscription<Position> positionStream;
 
+
   void vibrate() async {
-    bool canVibrate = await Vibrate.canVibrate;
-    canVibrate ? Vibrate.feedback(FeedbackType.medium) : null;
+    if (await Vibration.hasCustomVibrationsSupport()) {
+      Vibration.vibrate(duration: 10);
+    }
   }
 
   Future<Position> getLocation() async {
@@ -470,7 +476,8 @@ class _TransitAppState extends State<TransitApp> {
             // On Tap stop marker, update the next buses
             setState(() {
               tappedIntoStop = true;
-              nextBusesCopy = nextBuses;
+              nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+              scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
               count = 2;
               print("291");
               BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
@@ -621,10 +628,11 @@ class _TransitAppState extends State<TransitApp> {
         throw e;
       }
     }
+    if(zoomBool==true){
     updateStops(
         //358
         locationData.latitude.toString(),
-        locationData.longitude.toString());
+        locationData.longitude.toString());}
   }
 
   ///
@@ -716,7 +724,6 @@ class _TransitAppState extends State<TransitApp> {
   void _currentLocation() async {
     final GoogleMapController controller = mapController;
     Position currentLocation;
-    tappedIntoStop = false;
     var location = new Geolocator();
 //    LocationData currentLocation;
 //    var location = new Location();
@@ -762,25 +769,30 @@ class _TransitAppState extends State<TransitApp> {
             markers: _markers.values.toSet(),
             //google map
             onTap: (LatLng a) {
+              tappedIntoStop = false;
               setState(() {
-                if(nextBusesCopy != null){
+                if(nextBusesCopy != null&&scrollSheetDotListCopy != null){
                  nextBuses = nextBusesCopy;
+                 scrollSheetDotList = scrollSheetDotListCopy;
                 }
                 if (isSelected[1] == true) {}
                 _mapPolylines.clear();
               });
             },
             onCameraIdle: () {
-              setState(() {
-                if(nextBusesCopy!=null){
-                  nextBuses = nextBusesCopy;
-                }
-              });
+
               count--;
               print("ON MAP MOVE with count = " + count.toString());
               if (count <= 0) {
+                tappedIntoStop=false;
                 // moved into if statement to prevent on camera idle code on tap stop
                 highlightedStopNo = null;
+                setState(() {
+                  if(nextBusesCopy!=null&&scrollSheetDotListCopy!=null){
+                    nextBuses = nextBusesCopy;
+                    scrollSheetDotList = scrollSheetDotListCopy;
+                  }
+                });
                 if (isSelected[0] == false) {
                   showZoomInIfNeeded();
                 }
@@ -1281,7 +1293,8 @@ class _TransitAppState extends State<TransitApp> {
                 subtitle: Text(post.Name),
                 onTap: () {
                   setState(() {
-                    nextBusesCopy = nextBuses;
+                    nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+                    scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
                     isSelected = [false, true];
                     BusAtSingleStopFetcher busFetcher =
                         new BusAtSingleStopFetcher();
