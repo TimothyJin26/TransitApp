@@ -466,7 +466,7 @@ class _TransitSearchBarState<T> extends State<TransitSearchBar<T>>
             color: widget.searchBarStyle.surroundingColor,
           ),
           child: Padding(
-            padding: widget.searchBarPadding,
+            padding: _list.length>0? EdgeInsets.fromLTRB(10, 35, 10, 0): widget.searchBarPadding,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: <Widget>[

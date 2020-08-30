@@ -835,6 +835,7 @@ class _TransitAppState extends State<TransitApp> {
                     //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
                   ],
                   onPressed: (int index) {
+                    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
                     // Do some work (e.g. check sif the tap is valid)
                     vibrate();
                     // Do more work (e.g. respond to the tap)
