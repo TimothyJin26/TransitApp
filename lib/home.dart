@@ -71,7 +71,6 @@ class _TransitAppState extends State<TransitApp> {
   List<BothDirectionRouteWithTrips> nextBusesCopy = null;
   List scrollSheetDotListCopy = null;
 
-
   Ads appAds;
 
   final String appId = Platform.isAndroid
@@ -79,16 +78,17 @@ class _TransitAppState extends State<TransitApp> {
       : 'ca-app-pub-6078575452513504~1720853236';
 
   final String bannerUnitId = Platform.isAndroid
-  //test
+      //test
 //      ? 'ca-app-pub-3940256099942544/6300978111'
-  //real
+      //real
       ? 'ca-app-pub-6078575452513504/9492188580'
-  //ios
+      //ios
       : 'ca-app-pub-6078575452513504/5469183098';
 
   StreamSubscription<ConnectivityResult> subscription;
   StreamSubscription<Position> positionStream;
 
+  bool hasAnimated = false;
 
   void vibrate() async {
     if (await Vibration.hasCustomVibrationsSupport()) {
@@ -97,7 +97,7 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   Future<Position> getLocation() async {
-    if(userLocation!=null){
+    if (userLocation != null) {
       return userLocation;
     } else {
       Geolocator location = new Geolocator();
@@ -113,7 +113,7 @@ class _TransitAppState extends State<TransitApp> {
 //      Location location = new Location();
 //      LocationData locationData;
 //      location.getLocation().then((value) {
-        getLocation().then((locationData) {
+      getLocation().then((locationData) {
         print("Found initWithLocation success");
         setState(() {
           isLocationEnabled = true;
@@ -155,38 +155,29 @@ class _TransitAppState extends State<TransitApp> {
     super.initState();
 
     var geolocator = Geolocator();
-    var locationOptions = LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 10);
+    var locationOptions =
+        LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 10);
 
-    positionStream = geolocator.getPositionStream(locationOptions).listen(
-            (Position position) {
-              userLocation = position;
-              print("LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED ");
-        });
+    positionStream = geolocator
+        .getPositionStream(locationOptions)
+        .listen((Position position) {
+      userLocation = position;
+      // if map has not animated yet, animate it here
+      if (!hasAnimated) {
+        _currentLocation();
+      }
+      print(
+          "LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED LOCATION CHANGED ");
+    });
 
     appAds = Ads(
       appId,
       bannerUnitId: bannerUnitId,
-        size: AdSize.banner,
-//      screenUnitId: screenUnitId,
-//      keywords: <String>['ibm', 'computers'],
-//      contentUrl: 'http://www.ibm.com',
-//      childDirected: false,
-//      testDevices: ['Samsung_Galaxy_SII_API_26:5554'],
-      testing: true,
+      size: AdSize.banner,
+      testing: false,
     );
 
-
-
-
     appAds.showBannerAd();
-
-
-
-
-
-
-
-
 
     //Location stuff moved from onMapCreated
 
@@ -224,8 +215,6 @@ class _TransitAppState extends State<TransitApp> {
         listOfStops.add(s);
       }
     });
-
-
 
     // Updates the bus locations every 30 seconds
     timer = Timer.periodic(
@@ -278,7 +267,6 @@ class _TransitAppState extends State<TransitApp> {
           if (result != ConnectivityResult.none) {
             print("Connectivity changed - found connection");
             initWithLocation();
-            _currentLocation();
           } else {
             scrollsheetText = "No Internet Connection";
           }
@@ -314,7 +302,7 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void timerIfSelectedHelper() {
-    if(!tappedIntoStop) {
+    if (!tappedIntoStop) {
       updateNextBusesForAllNearbyStops();
     }
     timeLastUpdated = DateTime.now();
@@ -366,7 +354,7 @@ class _TransitAppState extends State<TransitApp> {
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
 
       final marker = Marker(
-        //Bus Marker
+          //Bus Marker
           onTap: () {
 //            mapController.showMarkerInfoWindow(MarkerId(bus.VehicleNo));
             setState(() {
@@ -471,13 +459,15 @@ class _TransitAppState extends State<TransitApp> {
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
       final marker = Marker(
-        //Stop Marker
+          //Stop Marker
           onTap: () {
             // On Tap stop marker, update the next buses
             setState(() {
+              if(!tappedIntoStop){
+                nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+                scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
+              }
               tappedIntoStop = true;
-              nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
-              scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
               count = 2;
               print("291");
               BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
@@ -509,7 +499,7 @@ class _TransitAppState extends State<TransitApp> {
     Position locationData;
     try {
 //      locationData = await location.getLocation();
-       locationData = await getLocation();
+      locationData = await getLocation();
       setState(() {
         isLocationEnabled = true;
         scrollsheetText = "Searching For Buses...";
@@ -547,7 +537,7 @@ class _TransitAppState extends State<TransitApp> {
   void renderListOfNextBuses(List<BothDirectionRouteWithTrips> buses) async {
     scrollSheetDotList.clear();
     nextBuses.clear();
-    if(buses.length==0){
+    if (buses.length == 0) {
       setState(() {
         scrollsheetText = "No Buses Found";
       });
@@ -628,11 +618,12 @@ class _TransitAppState extends State<TransitApp> {
         throw e;
       }
     }
-    if(zoomBool==true){
-    updateStops(
-        //358
-        locationData.latitude.toString(),
-        locationData.longitude.toString());}
+    if (zoomBool == true) {
+      updateStops(
+          //358
+          locationData.latitude.toString(),
+          locationData.longitude.toString());
+    }
   }
 
   ///
@@ -722,17 +713,21 @@ class _TransitAppState extends State<TransitApp> {
 // https://stackoverflow.com/questions/52569602/flutter-run-function-every-x-amount-of-seconds
 
   void _currentLocation() async {
+    if (mapController == null) {
+      return;
+    }
+
     final GoogleMapController controller = mapController;
     Position currentLocation;
     var location = new Geolocator();
-//    LocationData currentLocation;
-//    var location = new Location();
     try {
       setState(() {
         isLocationEnabled = true;
       });
 //      currentLocation = await location.getLocation();
       currentLocation = await location.getCurrentPosition();
+
+      hasAnimated = true;
       controller.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
           bearing: 0,
@@ -771,24 +766,23 @@ class _TransitAppState extends State<TransitApp> {
             onTap: (LatLng a) {
               tappedIntoStop = false;
               setState(() {
-                if(nextBusesCopy != null&&scrollSheetDotListCopy != null){
-                 nextBuses = nextBusesCopy;
-                 scrollSheetDotList = scrollSheetDotListCopy;
+                if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
+                  nextBuses = nextBusesCopy;
+                  scrollSheetDotList = scrollSheetDotListCopy;
                 }
                 if (isSelected[1] == true) {}
                 _mapPolylines.clear();
               });
             },
             onCameraIdle: () {
-
               count--;
               print("ON MAP MOVE with count = " + count.toString());
               if (count <= 0) {
-                tappedIntoStop=false;
+                tappedIntoStop = false;
                 // moved into if statement to prevent on camera idle code on tap stop
                 highlightedStopNo = null;
                 setState(() {
-                  if(nextBusesCopy!=null&&scrollSheetDotListCopy!=null){
+                  if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
                     nextBuses = nextBusesCopy;
                     scrollSheetDotList = scrollSheetDotListCopy;
                   }
@@ -964,11 +958,12 @@ class _TransitAppState extends State<TransitApp> {
                                                     ),
                                                     actions: [
                                                       popup.button(
-                                                        label: 'Close',
-                                                        onPressed: () {
-                                                          Navigator.of(context).pop();
-                                                        }
-                                                      ),
+                                                          label: 'Close',
+                                                          onPressed: () {
+                                                            Navigator.of(
+                                                                    context)
+                                                                .pop();
+                                                          }),
                                                     ],
                                                   );
                                                 });
@@ -997,7 +992,12 @@ class _TransitAppState extends State<TransitApp> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                           style: TextStyle(
-                                                            fontSize: removeZeroes(nextBuses[index].RouteNo).length<3? 50:35,
+                                                            fontSize: removeZeroes(
+                                                                            nextBuses[index].RouteNo)
+                                                                        .length <
+                                                                    3
+                                                                ? 50
+                                                                : 35,
                                                             height: 1.0,
                                                             fontWeight:
                                                                 FontWeight.w700,
@@ -1094,12 +1094,16 @@ class _TransitAppState extends State<TransitApp> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                           style: TextStyle(
-                                                            fontSize: nextBuses[index]
-                                                                .Trips[
-                                                            scrollSheetDotList[
-                                                            index]]
-                                                                .ExpectedCountdown
-                                                                .toString().length<3 ? 24 : 20,
+                                                            fontSize: nextBuses[
+                                                                            index]
+                                                                        .Trips[scrollSheetDotList[
+                                                                            index]]
+                                                                        .ExpectedCountdown
+                                                                        .toString()
+                                                                        .length <
+                                                                    3
+                                                                ? 24
+                                                                : 20,
                                                             fontWeight:
                                                                 FontWeight.w700,
                                                             height: 1.0,
@@ -1299,8 +1303,13 @@ class _TransitAppState extends State<TransitApp> {
                 subtitle: Text(post.Name),
                 onTap: () {
                   setState(() {
-                    nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
-                    scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
+                    //makes sure not to clone the wrong list
+                    if (!tappedIntoStop) {
+                      nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+                      scrollSheetDotListCopy =
+                      List<dynamic>.from(scrollSheetDotList);
+                    }
+                    tappedIntoStop = true;
                     isSelected = [false, true];
                     BusAtSingleStopFetcher busFetcher =
                         new BusAtSingleStopFetcher();
