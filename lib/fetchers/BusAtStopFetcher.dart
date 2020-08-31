@@ -55,7 +55,13 @@ class BusAtStopFetcher {
           SingleDirectionRouteWithTrips routeObjects =
               SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
           print(routeObjects.Schedules.toString());
+          var remove = [];
+          int count = 0;
           for (Trip t in routeObjects.Schedules) {
+            if(t.ExpectedCountdown<0){
+              //removes negative countdowns
+              remove.add(count);
+            }
             if (shortestDistance[counter].AtStreet == null||shortestDistance[counter].OnStreet == null) {
               t.nextStop = shortestDistance[counter].Name;
               t.StopNo = shortestDistance[counter].StopNo.toString();
@@ -63,8 +69,11 @@ class BusAtStopFetcher {
               t.nextStop = shortestDistance[counter].AtStreet + " and \n" + shortestDistance[counter].OnStreet;
               t.StopNo = shortestDistance[counter].StopNo.toString();
             }
+            count++;
           }
-
+          for(int i=remove.length-1;i>=0;i--){
+            routeObjects.Schedules.removeAt(remove[i]);
+          }
           List<String> list = new List<String>();
           for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
             list.add(routeTrip.RouteNo);
