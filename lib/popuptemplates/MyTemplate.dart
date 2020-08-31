@@ -97,7 +97,7 @@ class MyTemplate extends BeautifulPopupTemplate {
               title: Row(
                 children: <Widget>[
                   Container(
-                    width: 120,
+                    width: 130,
                     child: RichText(
                       textAlign: TextAlign.left,
                       text: TextSpan(

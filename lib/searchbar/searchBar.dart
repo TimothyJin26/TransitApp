@@ -494,6 +494,7 @@ class _TransitSearchBarState<T> extends State<TransitSearchBar<T>>
                           enableSuggestions: widget.enableSuggestions,
                           textInputAction: TextInputAction.unspecified,
                           decoration: InputDecoration(
+                            contentPadding: EdgeInsets.fromLTRB(0, 5, 0, 0),
                             icon: widget.icon,
                             border: InputBorder.none,
                             hintText: widget.hintText,

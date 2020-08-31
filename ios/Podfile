@@ -4,6 +4,9 @@
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Used to fix vibration build issue https://github.com/benjamindean/flutter_vibration/issues/1
+use_frameworks!
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,

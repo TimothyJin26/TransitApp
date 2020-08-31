@@ -813,7 +813,7 @@ class _TransitAppState extends State<TransitApp> {
                         text: 'Zoom in to see stops'))),
           ),
           Positioned(
-            top: 100,
+            top: 110,
             right: 7,
             left: 7,
             child: Align(
@@ -835,12 +835,10 @@ class _TransitAppState extends State<TransitApp> {
                     //ImageIcon( new AssetImage('images/marker-north-h.png'), color: null, size: 160),
                   ],
                   onPressed: (int index) {
-                    print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
                     // Do some work (e.g. check sif the tap is valid)
                     vibrate();
                     // Do more work (e.g. respond to the tap)
                     if (index == 0) {
-                      print("591");
                       updateBuses();
                       setState(() {
                         zoomBool = false;
@@ -867,7 +865,7 @@ class _TransitAppState extends State<TransitApp> {
             ),
           ),
           Positioned(
-            top: 158,
+            top: 168,
             right: 7,
             left: 7,
             child: Align(
@@ -893,7 +891,7 @@ class _TransitAppState extends State<TransitApp> {
           ),
           DraggableScrollableSheet(
             initialChildSize: 0.4,
-            minChildSize: 0.1,
+            minChildSize: 0.2,
             maxChildSize: 0.8,
             builder: (BuildContext context, myscrollController) {
               return Container(
@@ -1082,7 +1080,7 @@ class _TransitAppState extends State<TransitApp> {
                                                         ),
                                                       ),
                                                       Container(
-                                                        width: 80,
+                                                        width: 83,
                                                         child: Text(
                                                           nextBuses[index]
                                                                   .Trips[
@@ -1096,7 +1094,12 @@ class _TransitAppState extends State<TransitApp> {
                                                           overflow: TextOverflow
                                                               .ellipsis,
                                                           style: TextStyle(
-                                                            fontSize: 25,
+                                                            fontSize: nextBuses[index]
+                                                                .Trips[
+                                                            scrollSheetDotList[
+                                                            index]]
+                                                                .ExpectedCountdown
+                                                                .toString().length<3 ? 24 : 20,
                                                             fontWeight:
                                                                 FontWeight.w700,
                                                             height: 1.0,
@@ -1255,13 +1258,15 @@ class _TransitAppState extends State<TransitApp> {
               child: TransitSearchBar<Stop>(
             searchBarController: searchBarController,
             hintText: "Search for stops",
+            textStyle: new TextStyle(
+              fontSize: 18,
+            ),
             shrinkWrap: true,
             placeHolder: SizedBox.shrink(),
-            contentPadding: EdgeInsets.all(7),
-            searchBarPadding:
-                EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+            contentPadding: EdgeInsets.all(0),
+            searchBarPadding: EdgeInsets.fromLTRB(10, 20, 10, 0),
             searchBarStyle: SearchBarStyle(
-              searchBarHeight: 45,
+              searchBarHeight: 52,
               backgroundColor: getColorFromHex('e8eaed'),
               padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
               borderRadius: BorderRadius.circular(10),
