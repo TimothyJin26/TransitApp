@@ -8,36 +8,42 @@ import '../home.dart';
 
 class MyTemplate extends BeautifulPopupTemplate {
   final BeautifulPopup options;
-  MyTemplate(this.options, this.routeNo, this.pattern, this.stopNo, this.trips) : super(options);
+
+  MyTemplate(this.options, this.routeNo, this.pattern, this.stopNo, this.trips)
+      : super(options);
 
   @override
   final illustrationKey = 'images/mytemplate.png';
+
   @override
-  Color get primaryColor => options.primaryColor ?? Color(0xff000000); // The default primary color of the template is Colors.black.
+  Color get primaryColor =>
+      options.primaryColor ??
+      Color(
+          0xff000000); // The default primary color of the template is Colors.black.
   @override
-  final maxWidth = 400; // In most situations, the value is the illustration size.
+  final maxWidth =
+      400; // In most situations, the value is the illustration size.
   @override
   final maxHeight = 600;
   @override
   final bodyMargin = 10;
-
 
   final String routeNo;
   final String pattern;
   final String stopNo;
   List<Trip> trips;
 
-
-  String timeFormatter (String input){
+  String timeFormatter(String input) {
     String toRet = "";
     toRet = input.split(" ")[0];
-    if(toRet.contains("am")){
-      toRet = toRet.substring(0,toRet.length-2)+" AM";
-    } else{
-      toRet = toRet.substring(0,toRet.length-2)+" PM";
+    if (toRet.contains("am")) {
+      toRet = toRet.substring(0, toRet.length - 2) + " AM";
+    } else {
+      toRet = toRet.substring(0, toRet.length - 2) + " PM";
     }
     return toRet;
   }
+
   // You need to adjust the layout to fit into your illustration.
   @override
   get layout {
@@ -58,14 +64,12 @@ class MyTemplate extends BeautifulPopupTemplate {
         child: RichText(
           textAlign: TextAlign.center,
           text: TextSpan(
-            text: routeNo,
-            style: TextStyle(
-              color: Colors.white70,
-              fontWeight: FontWeight.w800,
-              fontSize: 100,
-            )
-
-          ),
+              text: routeNo,
+              style: TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w800,
+                fontSize: 100,
+              )),
         ),
       ),
       Positioned(
@@ -80,9 +84,7 @@ class MyTemplate extends BeautifulPopupTemplate {
                 color: Colors.white54,
                 fontWeight: FontWeight.w800,
                 fontSize: 25,
-              )
-
-          ),
+              )),
         ),
       ),
       Positioned(
@@ -106,30 +108,25 @@ class MyTemplate extends BeautifulPopupTemplate {
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
                             fontSize: 25,
-                          )
-
-                      ),
+                          )),
                     ),
-
                   ),
                   Expanded(
-                  child: Container(
-                    child: RichText(
-                      overflow: TextOverflow.fade,
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                          text: "TO "+trips[index].Destination,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 20,
-                          )
-
+                    child: Container(
+                      child: RichText(
+                        overflow: TextOverflow.fade,
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                            text: "TO " + trips[index].Destination,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 20,
+                            )),
                       ),
                     ),
-
                   ),
-                  ),],
+                ],
               ),
             );
           },
@@ -141,7 +138,17 @@ class MyTemplate extends BeautifulPopupTemplate {
         right: percentW(5),
         child: actions ?? Container(),
       ),
-
+      Positioned(
+        top: 9,
+        right: 9,
+        child: IconButton(
+            icon: Icon(Icons.close),
+            iconSize: 40,
+            color: Colors.white,
+            onPressed: () {
+              Navigator.of(options.context).pop();
+            }),
+      ),
     ];
   }
 }

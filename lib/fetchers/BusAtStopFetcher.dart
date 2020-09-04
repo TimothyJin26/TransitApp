@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
@@ -29,9 +30,9 @@ class BusAtStopFetcher {
       return distanceA.compareTo(distanceB);
     });
 
-    shortestDistance = stopList.sublist(0, 8);
+    shortestDistance = stopList.sublist(0, 6);
+
     //  Go through every stop to fetch the next buses
-    print("thirty one (31) trente et un (31)" + stopList.toString());
 
     List<Future<Response>> futures = [];
 
@@ -44,6 +45,7 @@ class BusAtStopFetcher {
       };
 
       futures.add(http.get(stopLocationsURL, headers: requestHeaders));
+      print("GETTING STOP " + stop.StopNo.toString() + " " + stop.Name);
     }
     var counter = 0;
     for(Future<Response> r in futures) {
@@ -54,7 +56,6 @@ class BusAtStopFetcher {
           // Go through each of the next buses for the stop
           SingleDirectionRouteWithTrips routeObjects =
               SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
-          print(routeObjects.Schedules.toString());
           var remove = [];
           int count = 0;
           for (Trip t in routeObjects.Schedules) {
@@ -66,7 +67,7 @@ class BusAtStopFetcher {
               t.nextStop = shortestDistance[counter].Name;
               t.StopNo = shortestDistance[counter].StopNo.toString();
             } else{
-              t.nextStop = shortestDistance[counter].AtStreet + " and \n" + shortestDistance[counter].OnStreet;
+              t.nextStop = shortestDistance[counter].AtStreet.trim() + " and \n" + shortestDistance[counter].OnStreet.trim().substring(shortestDistance[counter].OnStreet.indexOf(" ")+1);
               t.StopNo = shortestDistance[counter].StopNo.toString();
             }
             count++;
@@ -78,7 +79,13 @@ class BusAtStopFetcher {
           for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
             list.add(routeTrip.RouteNo);
           }
+          print("---");
           print(routeObjects.RouteNo);
+          print(routeObjects.Schedules.toString());
+          for (var s in routeObjects.Schedules) {
+            print("   " + s.Destination);
+          }
+          print("---");
           if (!list.contains(routeObjects.RouteNo)) {
             routeTrips.add(new BothDirectionRouteWithTrips(
                 routeObjects.RouteNo, routeObjects.Schedules));
