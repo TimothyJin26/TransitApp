@@ -17,8 +17,7 @@ class BusAtStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busFetcher(
       List<Stop> stopList, double Lat, double Lng) async {
     print(DateTime.now().toString() + " START OF BUS FETCHER");
-    List<BothDirectionRouteWithTrips> routeTrips = new List<
-        BothDirectionRouteWithTrips>(); // Gets stops that are closest to the user
+    List<BothDirectionRouteWithTrips> routeTrips = new List<BothDirectionRouteWithTrips>(); // Gets stops that are closest to the user
     List<Stop> shortestDistance = new List<Stop>();
     stopList.sort((a, b) {
       var distanceLatA = pow(a.Latitude - Lat, 2);

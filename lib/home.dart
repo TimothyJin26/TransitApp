@@ -540,6 +540,7 @@ class _TransitAppState extends State<TransitApp> {
     Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
         .busFetcher(stops, locationData.latitude, locationData.longitude);
     List<BothDirectionRouteWithTrips> buses = await futureBuses;
+    print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
     renderListOfNextBuses(buses);
     setState(() {
       isLocationEnabled = true;
@@ -1277,6 +1278,30 @@ class _TransitAppState extends State<TransitApp> {
                           ),
                         ]),
                       ),
+
+                      Positioned(
+                          right: 70.0,
+                          child: Container(
+                            height: 24,
+                            width: 24,
+                            child: FittedBox(
+                              child: FloatingActionButton(
+                                onPressed: () {
+                                  if (!tappedIntoStop) {
+                                    updateNextBusesForAllNearbyStops();
+                                  }
+                                  if (isSelected[0] == true) {
+                                    updateBuses();
+                                  }
+                                },
+                                child: Icon(
+                                  Icons.refresh,
+                                  size: 50,
+                                  color: Color.fromRGBO(255, 255, 255, 0.9),
+                                ),
+                                backgroundColor: Colors.grey,
+                              ),
+                            ),),),
                       Positioned(
                           right: 0.0,
                           child: Container(
