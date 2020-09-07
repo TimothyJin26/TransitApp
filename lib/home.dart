@@ -560,24 +560,24 @@ class _TransitAppState extends State<TransitApp> {
     }
     for (BothDirectionRouteWithTrips b in buses) {
       var directions = [];
-      var directionToTrip = new HashMap<String, Trip>();
+      var destinationToTrip = new HashMap<String, Trip>();
       for (Trip t in b.Trips) {
-        if (directionToTrip.containsKey(t.Pattern)) {
+        if (destinationToTrip.containsKey(patternHelper(t.Pattern))) {
           if (t.ExpectedCountdown <
-              directionToTrip[t.Pattern].ExpectedCountdown) {
-            directionToTrip[t.Pattern] = t;
+              destinationToTrip[patternHelper(t.Pattern)].ExpectedCountdown) {
+            destinationToTrip[patternHelper(t.Pattern)] = t;
           }
         } else {
-          directionToTrip[t.Pattern] = t;
-          directions.add(t.Pattern);
+          destinationToTrip[patternHelper(t.Pattern)] = t;
+          directions.add(patternHelper(t.Pattern));
         }
       }
       BothDirectionRouteWithTrips bitrip =
           new BothDirectionRouteWithTrips("", []);
       bitrip.RouteNo = b.RouteNo;
       for (String s in directions) {
-        directionToTrip[s].RouteNo = b.RouteNo;
-        bitrip.Trips.add(directionToTrip[s]);
+        destinationToTrip[s].RouteNo = b.RouteNo;
+        bitrip.Trips.add(destinationToTrip[s]);
       }
       setState(() {
         nextBuses.add(bitrip);
@@ -809,6 +809,9 @@ class _TransitAppState extends State<TransitApp> {
             //google map
             onTap: (LatLng a) {
               tappedIntoStop = false;
+              if (searchBarController!=null){
+                searchBarController.clear();
+              }
               setState(() {
                 if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
                   nextBuses = nextBusesCopy;
@@ -1368,6 +1371,7 @@ class _TransitAppState extends State<TransitApp> {
             child: Container(
                 child: TransitSearchBar<Stop>(
               searchBarController: searchBarController,
+              minimumChars: 1,
               hintText: "Search for stops",
               textStyle: new TextStyle(
                 fontSize: 18,
