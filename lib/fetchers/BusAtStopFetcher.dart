@@ -80,7 +80,6 @@ class BusAtStopFetcher {
           }
           print("---");
           print(routeObjects.RouteNo);
-          print(routeObjects.Schedules.toString());
           for (var s in routeObjects.Schedules) {
             print("   " + s.Destination);
           }

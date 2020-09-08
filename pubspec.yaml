@@ -35,7 +35,7 @@ dependencies:
     git:
       url: git://github.com/TimothyJin26/flappy_search_bar.git
       ref: master
-  geolocator: 5.3.2+2
+  geolocator: 6.0.0+4
   archive: 2.0.13
   vibration: 1.4.0
   flutter:

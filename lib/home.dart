@@ -11,7 +11,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter_beautiful_popup/main.dart';
 import 'dart:ui' as ui;
 import 'package:carousel_slider/carousel_slider.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show PlatformException, rootBundle;
 import 'package:firebase_admob/firebase_admob.dart';
 
 import 'package:flutter/material.dart';
@@ -101,6 +101,8 @@ class _TransitAppState extends State<TransitApp> {
   Map<String, Marker> _markers = {};
   bool showingSpecificBuses = false;
 
+  bool hasLoaded = false;
+
   void vibrate() async {
     if (await Vibration.hasCustomVibrationsSupport()) {
       Vibration.vibrate(duration: 10);
@@ -109,12 +111,13 @@ class _TransitAppState extends State<TransitApp> {
 
   Future<Position> getLocation() async {
     if (userLocation != null) {
+      print("USER LOCATION IS NOT NULL");
       return userLocation;
     } else {
-      Geolocator location = new Geolocator();
-      return location.getCurrentPosition(
-        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-      );
+      print("GETTING CURRENT LOCATION...");
+      return getCurrentPosition(
+//        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+          );
     }
   }
 
@@ -127,6 +130,10 @@ class _TransitAppState extends State<TransitApp> {
 //      LocationData locationData;
 //      location.getLocation().then((value) {
       getLocation().then((locationData) {
+        userLocation = locationData;
+        if (!hasAnimated) {
+          _currentLocation();
+        }
         print("Found initWithLocation success");
         setState(() {
           isLocationEnabled = true;
@@ -150,7 +157,9 @@ class _TransitAppState extends State<TransitApp> {
           // render the next buses on scrollsheet
           updateNextBusesForAllNearbyStops();
         }
+        hasLoaded = true;
       }).catchError((onError) {
+        hasLoaded = true;
         print("Found initWithLocation error");
         print(onError.toString());
         setState(() {
@@ -167,19 +176,13 @@ class _TransitAppState extends State<TransitApp> {
   void initState() {
     super.initState();
 
-    var geolocator = Geolocator();
-    var locationOptions =
-        LocationOptions(accuracy: LocationAccuracy.high, distanceFilter: 10);
-
-    positionStream = geolocator
-        .getPositionStream(locationOptions)
-        .listen((Position position) {
-      userLocation = position;
-      // if map has not animated yet, animate it here
-      if (!hasAnimated) {
-        _currentLocation();
-      }
-    });
+    try {
+      positionStream = getPositionStream().listen((Position position) {
+        userLocation = position;
+      });
+    } catch (e) {
+      // Permission Denied
+    }
 
     appAds = Ads(
       appId,
@@ -245,29 +248,33 @@ class _TransitAppState extends State<TransitApp> {
     //       Add code to cancel
     WidgetsBinding.instance.addObserver(LifecycleEventHandler(
         resumeCallBack: () async => setState(() {
-              print(
-                  "TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED ");
-              timerIfSelectedHelper();
-              timerIfSelectedHelperShort();
-              timer = Timer.periodic(
-                  Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
+              if (hasLoaded) {
+                print(
+                    "TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED ");
+                timerIfSelectedHelper();
+                timerIfSelectedHelperShort();
+                timer = Timer.periodic(Duration(seconds: 30),
+                    (Timer t) => timerIfSelectedHelper());
 
-              // Updates the countdown clock every 2 seconds
-              timerShort = Timer.periodic(Duration(seconds: 2),
-                  (Timer t) => timerIfSelectedHelperShort());
+                // Updates the countdown clock every 2 seconds
+                timerShort = Timer.periodic(Duration(seconds: 2),
+                    (Timer t) => timerIfSelectedHelperShort());
 
-              subscription?.resume();
-              positionStream?.resume();
+                subscription?.resume();
+                positionStream?.resume();
 
-              initWithLocation();
+                initWithLocation();
+              }
             }),
         suspendingCallBack: () async => setState(() {
-              print(
-                  "TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED ");
-              timer?.cancel();
-              timerShort?.cancel();
-              subscription?.pause();
-              positionStream?.pause();
+              if (hasLoaded) {
+                print(
+                    "TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED ");
+                timer?.cancel();
+                timerShort?.cancel();
+                subscription?.pause();
+                positionStream?.pause();
+              }
             })));
 
     Connectivity().checkConnectivity().then((connectivityResult) {
@@ -508,11 +515,8 @@ class _TransitAppState extends State<TransitApp> {
   /// Renders scrollable scrollsheet
   void updateNextBusesForAllNearbyStops() async {
     print("somewhere at the start");
-//    Location location = new Location();
-//    LocationData locationData;
     Position locationData;
     try {
-//      locationData = await location.getLocation();
       locationData = await getLocation();
       setState(() {
         isLocationEnabled = true;
@@ -540,7 +544,8 @@ class _TransitAppState extends State<TransitApp> {
     Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
         .busFetcher(stops, locationData.latitude, locationData.longitude);
     List<BothDirectionRouteWithTrips> buses = await futureBuses;
-    print("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+    print(
+        "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
     renderListOfNextBuses(buses);
     setState(() {
       isLocationEnabled = true;
@@ -615,11 +620,8 @@ class _TransitAppState extends State<TransitApp> {
   /// Fetches location and calls Translink API and updates bus stops on map
   ///
   void getLocationAndUpdateStops() async {
-//    Location location = new Location();
-//    LocationData locationData;
     Position locationData;
     try {
-//      locationData = await location.getLocation();
       locationData = await getLocation();
       setState(() {
         isLocationEnabled = true;
@@ -722,10 +724,10 @@ class _TransitAppState extends State<TransitApp> {
   ///
   Future<void> _onMapCreated(GoogleMapController controller) async {
     mapController = controller;
-    _currentLocation();
     mapController.setMapStyle(
         '[  {    "elementType": "geometry",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "featureType": "administrative.locality",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "poi",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi.park",    "stylers": [      {        "visibility": "on"      }    ]  },  {    "featureType": "poi.park",    "elementType": "geometry",    "stylers": [      {        "color": "#263c3f"      }    ]  },  {    "featureType": "poi.park",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#6b9a76"      }    ]  },  {    "featureType": "road",    "elementType": "geometry",    "stylers": [      {        "color": "#38414e"      }    ]  },  {    "featureType": "road",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#212a37"      },      {        "visibility": "simplified"      },      {        "weight": 2      }    ]  },  {    "featureType": "road",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#9ca5b3"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#1f2835"      }    ]  },  {    "featureType": "road.highway",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#f3d19c"      }    ]  },  {    "featureType": "transit",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "transit",    "elementType": "geometry",    "stylers": [      {        "color": "#2f3948"      }    ]  },  {    "featureType": "transit.station",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "water",    "elementType": "geometry",    "stylers": [      {        "color": "#17263c"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#515c6d"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#17263c"      }    ]  }]');
     // Find the current location of the user
+    _currentLocation();
   }
 
 // https://stackoverflow.com/questions/52569602/flutter-run-function-every-x-amount-of-seconds
@@ -735,17 +737,20 @@ class _TransitAppState extends State<TransitApp> {
       return;
     }
 
+    if (userLocation == null) {
+      return;
+    }
+
     final GoogleMapController controller = mapController;
-    Position currentLocation;
-    var location = new Geolocator();
+//    Position currentLocation;
     try {
       setState(() {
         isLocationEnabled = true;
       });
 //      currentLocation = await location.getLocation();
-      currentLocation = await location.getCurrentPosition(
-        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-      );
+//      currentLocation = await getCurrentPosition(
+////        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
+//      );
       setState(() {
         isLocationOnMapEnabled = true;
       });
@@ -754,7 +759,7 @@ class _TransitAppState extends State<TransitApp> {
       controller.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
           bearing: 0,
-          target: LatLng(currentLocation.latitude, currentLocation.longitude),
+          target: LatLng(userLocation.latitude, userLocation.longitude),
           zoom: 17.0,
         ),
       ));
@@ -763,7 +768,7 @@ class _TransitAppState extends State<TransitApp> {
         isLocationEnabled = false;
         scrollsheetText = "Location Services Disabled";
       });
-      currentLocation = null;
+      userLocation = null;
     }
   }
 
@@ -788,20 +793,23 @@ class _TransitAppState extends State<TransitApp> {
             markers: _markers.values
                 .where((marker) {
                   // Based on selected route, return true if marker is part of that route
-                  if (selectedRouteNo == null) {
+                  if (selectedRouteNo == null || selectedPattern == null) {
                     return true;
                   }
                   if (marker.markerId.toString().split('!').length < 3) {
                     //hiding stop markers while getting buses
                     return false;
                   }
-                  if (marker.markerId.toString().split('!')[1] !=
+                  if (marker.markerId.toString().split('!')[1] ==
                           removeZeroes(selectedRouteNo) &&
-                      marker.markerId.toString().split('!')[2] !=
-                          selectedPattern) {
-                    return false;
-                  } else {
+                      marker.markerId
+                              .toString()
+                              .split('!')[2]
+                              .substring(0, 1) ==
+                          selectedPattern.substring(0, 1)) {
                     return true;
+                  } else {
+                    return false;
                   }
                 })
                 .toSet()
@@ -809,7 +817,7 @@ class _TransitAppState extends State<TransitApp> {
             //google map
             onTap: (LatLng a) {
               tappedIntoStop = false;
-              if (searchBarController!=null){
+              if (searchBarController != null) {
                 searchBarController.clear();
               }
               setState(() {
@@ -880,7 +888,8 @@ class _TransitAppState extends State<TransitApp> {
                     onPressed: (int index) {
                       // Do some work (e.g. check sif the tap is valid)
                       vibrate();
-                      if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
+                      if (nextBusesCopy != null &&
+                          scrollSheetDotListCopy != null) {
                         nextBuses = nextBusesCopy;
                         scrollSheetDotList = scrollSheetDotListCopy;
                       }
@@ -1274,37 +1283,39 @@ class _TransitAppState extends State<TransitApp> {
                                                         fontStyle:
                                                             FontStyle.normal,
                                                         fontSize: 16),
-                                                    text:
-                                                        "Please allow Transit to access your location to improve your experience"))),
+                                                    text: !tappedIntoStop
+                                                        ? "Please allow Transit to access your location to improve your experience"
+                                                        : ""))),
                                       )),
                                 ]),
                           ),
                         ]),
                       ),
-
                       Positioned(
-                          right: 70.0,
-                          child: Container(
-                            height: 24,
-                            width: 24,
-                            child: FittedBox(
-                              child: FloatingActionButton(
-                                onPressed: () {
-                                  if (!tappedIntoStop) {
-                                    updateNextBusesForAllNearbyStops();
-                                  }
-                                  if (isSelected[0] == true) {
-                                    updateBuses();
-                                  }
-                                },
-                                child: Icon(
-                                  Icons.refresh,
-                                  size: 50,
-                                  color: Color.fromRGBO(255, 255, 255, 0.9),
-                                ),
-                                backgroundColor: Colors.grey,
+                        right: 70.0,
+                        child: Container(
+                          height: 24,
+                          width: 24,
+                          child: FittedBox(
+                            child: FloatingActionButton(
+                              onPressed: () {
+                                if (!tappedIntoStop) {
+                                  updateNextBusesForAllNearbyStops();
+                                }
+                                if (isSelected[0] == true) {
+                                  updateBuses();
+                                }
+                              },
+                              child: Icon(
+                                Icons.refresh,
+                                size: 50,
+                                color: Color.fromRGBO(255, 255, 255, 0.9),
                               ),
-                            ),),),
+                              backgroundColor: Colors.grey,
+                            ),
+                          ),
+                        ),
+                      ),
                       Positioned(
                           right: 0.0,
                           child: Container(
@@ -1501,8 +1512,6 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void filterBuses(String routeNo, String pattern, String stopNo) {
-    print(
-        "ASDFDASDYUIFOAKJSHGEFTYUIJKNBGVSFTYUIJKNGVFRT6Y7U8IESJEUHHHHHHU888888888888888888888888888");
     if (isSelected[1]) {
       setState(() {
         isSelected[0] = true;
