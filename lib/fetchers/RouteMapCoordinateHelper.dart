@@ -25,11 +25,11 @@ class RouteMapCoordinateHelper {
         if (file.isFile) {
           final data = file.content as List<int>;
           String bar = utf8.decode(data);
-          print(bar.toString());
+//          print(bar.toString());
           final document = xml.parse(bar);
           Iterable<xml.XmlElement> coordinateList = document.findAllElements('coordinates');
-          print(coordinateList.toString());
-          print(url.toString());
+//          print(coordinateList.toString());
+//          print(url.toString());
           for(xml.XmlElement e in coordinateList){
             var stringList = e.text.split("0.0 ");
             for(String s in stringList){

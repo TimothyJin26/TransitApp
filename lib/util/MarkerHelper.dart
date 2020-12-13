@@ -8,10 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MarkerHelper {
-
-
-
-
+  
   static Future<BitmapDescriptor> createCustomMarkerBitmapNoText(ui.Image image, int h, int w) async {
 
     int width = w;
@@ -22,6 +19,7 @@ class MarkerHelper {
     Rect oval = Rect.fromLTWH(0, 0, width + 0.0, height + 0.0);
 
     // Alternatively use your own method to get the image
+
 
     paintImage(canvas: c, image: image, rect: oval, fit: BoxFit.fitWidth);
 

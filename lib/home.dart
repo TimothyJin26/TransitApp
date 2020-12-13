@@ -1,10 +1,13 @@
-//flutter build apk --split-per-abi
+// Android build:
+// flutter build apk --split-per-abi
+// iOS build:
+// flutter build ios --release
 
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:ads/ads.dart';
+import 'package:admob_flutter/admob_flutter.dart';
 import 'package:app_settings/app_settings.dart';
 import 'package:connectivity/connectivity.dart';
 import 'package:flutter/gestures.dart';
@@ -12,7 +15,6 @@ import 'package:flutter_beautiful_popup/main.dart';
 import 'dart:ui' as ui;
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:flutter/services.dart' show PlatformException, rootBundle;
-import 'package:firebase_admob/firebase_admob.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -78,19 +80,15 @@ class _TransitAppState extends State<TransitApp> {
   var selectedPattern;
   var selectedStop;
 
-  Ads appAds;
-
   final String appId = Platform.isAndroid
       ? 'ca-app-pub-6078575452513504~1720853236'
-      : 'ca-app-pub-6078575452513504~1720853236';
+      : 'ca-app-pub-6078575452513504~8954310532';
 
   final String bannerUnitId = Platform.isAndroid
-      //test
-//      ? 'ca-app-pub-3940256099942544/6300978111'
-      //real
-      ? 'ca-app-pub-6078575452513504/9492188580'
-      //ios
-      : 'ca-app-pub-6078575452513504/5469183098';
+//      ? 'ca-app-pub-3940256099942544/2934735716' // Android banner test ID
+      ? 'ca-app-pub-6078575452513504/9492188580' // Android banner
+      : 'ca-app-pub-6078575452513504/6253454560'; // iOS banner
+//      : 'ca-app-pub-3940256099942544/2934735716'; // iOS banner test ID
 
   StreamSubscription<ConnectivityResult> subscription;
   StreamSubscription<Position> positionStream;
@@ -162,6 +160,7 @@ class _TransitAppState extends State<TransitApp> {
         hasLoaded = true;
         print("Found initWithLocation error");
         print(onError.toString());
+        updateBuses();
         setState(() {
           isLocationEnabled = false;
           scrollsheetText = "Location Services Disabled";
@@ -184,15 +183,6 @@ class _TransitAppState extends State<TransitApp> {
       // Permission Denied
     }
 
-    appAds = Ads(
-      appId,
-      bannerUnitId: bannerUnitId,
-      size: AdSize.banner,
-      testing: false,
-    );
-
-    appAds.showBannerAd();
-
     //Location stuff moved from onMapCreated
 
 //   catch (e) {
@@ -202,37 +192,38 @@ class _TransitAppState extends State<TransitApp> {
 //      }
 //    }
 
-    //Previous stuff
-    listOfStops.clear();
-    rootBundle.loadString('assets/stops.txt').then((stopList) {
-      List<String> lines = stopList.split('\n');
-      var header = lines[0].split(',');
-      int StopNoCol = header.indexOf("stop_code");
-      int NameCol = header.indexOf("stop_name");
-      int LongCol = header.indexOf("stop_lon");
-      int LatCol = header.indexOf("stop_lat");
-      lines.removeAt(0);
-      for (String l in lines) {
-        Stop s = new Stop();
-        List<String> paste = l.split(',');
-        try {
-          s.StopNo = (int.parse(paste[StopNoCol]));
-        } catch (e) {
-          continue;
-        }
-        s.Name = paste[NameCol];
-        s.Longitude = double.parse(paste[LongCol]);
-        if (paste[NameCol].contains('@')) {
-          s.OnStreet = paste[NameCol].split('@')[0];
-          s.AtStreet = paste[NameCol].split('@')[1];
-        } else {
-          s.OnStreet = paste[NameCol];
-          s.AtStreet = "";
-        }
+    WidgetsFlutterBinding.ensureInitialized();
+    // Initialize without device test ids.
+    Admob.initialize();
+//    Admob.initialize(testDeviceIds: ['F1D272CE815B4D550E263F55298A8A41', 'abed5c3de5e25479dc8213ade8ac8191']);
 
-        s.Latitude = double.parse(paste[LatCol]);
-        listOfStops.add(s);
-      }
+    // Wait for the stops to load before checking connectivity and loading buses
+    loadListOfStops().then((stops) {
+      listOfStops = stops;
+
+      Connectivity().checkConnectivity().then((connectivityResult) {
+        if (connectivityResult == ConnectivityResult.none) {
+          setState(() {
+            scrollsheetText = "No Internet Connection";
+          });
+
+          // Listen for connectivity changes, in case user gets internet later
+          subscription = Connectivity()
+              .onConnectivityChanged
+              .listen((ConnectivityResult result) {
+            if (result != ConnectivityResult.none) {
+              print("Connectivity changed - found connection");
+              initWithLocation();
+            } else {
+              scrollsheetText = "No Internet Connection";
+            }
+          });
+        } else {
+          print("Connectivity available - found connection");
+          initWithLocation();
+        }
+        // I am connected to a wifi network.
+      });
     });
 
     // Updates the bus locations every 30 seconds
@@ -276,30 +267,6 @@ class _TransitAppState extends State<TransitApp> {
                 positionStream?.pause();
               }
             })));
-
-    Connectivity().checkConnectivity().then((connectivityResult) {
-      if (connectivityResult == ConnectivityResult.none) {
-        setState(() {
-          scrollsheetText = "No Internet Connection";
-        });
-
-        // Listen for connectivity changes, in case user gets internet later
-        subscription = Connectivity()
-            .onConnectivityChanged
-            .listen((ConnectivityResult result) {
-          if (result != ConnectivityResult.none) {
-            print("Connectivity changed - found connection");
-            initWithLocation();
-          } else {
-            scrollsheetText = "No Internet Connection";
-          }
-        });
-      } else {
-        print("Connectivity available - found connection");
-        initWithLocation();
-      }
-      // I am connected to a wifi network.
-    });
   }
 
   void timerIfSelectedHelperShort() {
@@ -322,6 +289,40 @@ class _TransitAppState extends State<TransitApp> {
 //        }
 //      });
     }
+  }
+
+  Future<List<Stop>> loadListOfStops() async {
+    String stopList = await rootBundle.loadString('assets/stops.txt');
+    List<Stop> stops = [];
+    List<String> lines = stopList.split('\n');
+    var header = lines[0].split(',');
+    int StopNoCol = header.indexOf("stop_code");
+    int NameCol = header.indexOf("stop_name");
+    int LongCol = header.indexOf("stop_lon");
+    int LatCol = header.indexOf("stop_lat");
+    lines.removeAt(0);
+    for (String l in lines) {
+      Stop s = new Stop();
+      List<String> paste = l.split(',');
+      try {
+        s.StopNo = (int.parse(paste[StopNoCol]));
+      } catch (e) {
+        continue;
+      }
+      s.Name = paste[NameCol];
+      s.Longitude = double.parse(paste[LongCol]);
+      if (paste[NameCol].contains('@')) {
+        s.OnStreet = paste[NameCol].split('@')[0];
+        s.AtStreet = paste[NameCol].split('@')[1];
+      } else {
+        s.OnStreet = paste[NameCol];
+        s.AtStreet = "";
+      }
+
+      s.Latitude = double.parse(paste[LatCol]);
+      stops.add(s);
+    }
+    return stops;
   }
 
   void timerIfSelectedHelper() {
@@ -544,13 +545,10 @@ class _TransitAppState extends State<TransitApp> {
     Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
         .busFetcher(stops, locationData.latitude, locationData.longitude);
     List<BothDirectionRouteWithTrips> buses = await futureBuses;
-    print(
-        "OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
     renderListOfNextBuses(buses);
     setState(() {
       isLocationEnabled = true;
     });
-    print("somewhere at the end");
   }
 
   /// Renders scrollable scrollsheet
@@ -1491,12 +1489,59 @@ class _TransitAppState extends State<TransitApp> {
               ),
             ),
           ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: Align(
+              alignment: Alignment.center,
+              child: AdmobBanner(
+                adUnitId: bannerUnitId,
+                adSize: AdmobBannerSize.BANNER,
+                nonPersonalizedAds: true,
+                listener: (AdmobAdEvent event, Map<String, dynamic> args) {
+                  switch (event) {
+                    case AdmobAdEvent.loaded:
+                      print("[Transit Ads] Loaded");
+                      break;
+                    case AdmobAdEvent.opened:
+                      print("[Transit Ads] Opened");
+                      break;
+                    case AdmobAdEvent.closed:
+                      print("[Transit Ads] Closed");
+                      break;
+                    case AdmobAdEvent.failedToLoad:
+                      print("[Transit Ads] Admob banner failed to load. Error code: ${args['errorCode']}");
+                      break;
+                    case AdmobAdEvent.clicked:
+                      print("[Transit Ads] Clicked");
+                      break;
+                    case AdmobAdEvent.impression:
+                      print("[Transit Ads] Impression");
+                      break;
+                    case AdmobAdEvent.leftApplication:
+                      print("[Transit Ads] Left Application");
+                      break;
+                    case AdmobAdEvent.completed:
+                      print("[Transit Ads] Completed");
+                      break;
+                    case AdmobAdEvent.rewarded:
+                      print("[Transit Ads] Reward");
+                      break;
+                    case AdmobAdEvent.started:
+                      print("[Transit Ads] Started");
+                      break;
+                  }
+                }
+              ),
+            ),
+          ),
         ]),
       ));
 
   void showZoomInIfNeeded() {
     mapController.getZoomLevel().then((value) {
-      if (value > 15) {
+      if (value >= 14) {
         zoomBool = false;
         mapController.getVisibleRegion().then((value) {
           updateStopsForMap(value.northeast.latitude, value.southwest.latitude,
@@ -1525,21 +1570,12 @@ class _TransitAppState extends State<TransitApp> {
         double latitude;
         double longitude;
         String stopName;
-        print(
-            "88888888888888888888888888888888888888888888888888888888888888888888");
         print(routeNo + " " + pattern + " " + stopNo);
         for (Stop s in listOfStops) {
           if (s.StopNo.toString() == stopNo) {
             latitude = s.Latitude;
             longitude = s.Longitude;
             stopName = s.Name;
-            print(
-                "ASDFDASDYUIFOAKJSHGEFTYUIJKNBGVSFTYUIJKNGVFRT6Y7U8IESJEUHHHHHHU888888888888888888888888888");
-            print(latitude.toString() +
-                " " +
-                longitude.toString() +
-                " " +
-                stopName);
             break;
           }
         }

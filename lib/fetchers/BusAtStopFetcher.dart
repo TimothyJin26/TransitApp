@@ -16,7 +16,7 @@ import 'package:transitapp/models/Trip.dart';
 class BusAtStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busFetcher(
       List<Stop> stopList, double Lat, double Lng) async {
-    print(DateTime.now().toString() + " START OF BUS FETCHER");
+    print(DateTime.now().toString() + " START OF BUS FETCHER at " + Lat.toString() + " ; " + Lng.toString() + " and stoplist of size " + stopList.length.toString());
     List<BothDirectionRouteWithTrips> routeTrips = new List<BothDirectionRouteWithTrips>(); // Gets stops that are closest to the user
     List<Stop> shortestDistance = new List<Stop>();
     stopList.sort((a, b) {
@@ -29,7 +29,7 @@ class BusAtStopFetcher {
       return distanceA.compareTo(distanceB);
     });
 
-    shortestDistance = stopList.sublist(0, 6);
+    shortestDistance = stopList.sublist(0, min(stopList.length, 6));
 
     //  Go through every stop to fetch the next buses
 
