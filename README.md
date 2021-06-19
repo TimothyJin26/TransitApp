@@ -10,4 +10,4 @@ Download links:
 - [Apple App Store](https://apps.apple.com/us/app/vancouver-transit-real-time/id1537352935)
 
 For more information visit our website:
-[jttechnologyapps.com](https://jttechnologyapps.com/)9
+[jttechnologyapps.com](https://jttechnologyapps.com/)
