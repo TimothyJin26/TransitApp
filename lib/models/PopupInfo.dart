@@ -1,11 +1,13 @@
 import 'package:transitapp/models/Trip.dart';
 
-class BothDirectionRouteWithTrips {
-  BothDirectionRouteWithTrips(String RouteNumber, List<Trip> trips) {
-    this.RouteNo = RouteNumber;
-    this.Trips = trips;
+class PopupInfo {
+  PopupInfo(String stopNo, String routeNo, String pattern) {
+    this.stopNo = stopNo;
+    this.routeNo = routeNo;
+    this.pattern = pattern;
   }
 
-  String RouteNo;
-  List<Trip> Trips;
+  String routeNo;
+  String stopNo;
+  String pattern;
 }

@@ -11,7 +11,7 @@ description: A new Flutter application.
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+1
+version: 1.0.7+1
 
 environment:
   sdk: ">=2.9.0 <3.0.0"
@@ -25,12 +25,15 @@ flutter_icons:
   adaptive_icon_foreground: "images/app-icon-foreground.png"
 
 dependencies:
+  daylight: 1.0.0
+  slide_popup_dialog: 0.0.2
   admob_flutter: ^1.0.0
   connectivity: 0.4.9+2
   app_settings: 4.0.3
   flutter_launcher_icons: 0.7.5
   flutter_beautiful_popup: 1.5.0
   carousel_slider: 2.2.1
+  url_launcher: ^5.7.10
   flappy_search_bar:
     git:
       url: git://github.com/TimothyJin26/flappy_search_bar.git
@@ -41,7 +44,6 @@ dependencies:
   flutter:
     sdk: flutter
   http: 0.12.0+4
-  json_serializable: 3.2.4
   # https://github.com/flutter/flutter/issues/40982 for infowindow white text issue
   google_maps_flutter: 0.5.27+3
 
@@ -55,6 +57,7 @@ dev_dependencies:
 #  test: 1.15.0
   pedantic: 1.8.0+1
   build_runner: 1.8.0
+  json_serializable: 3.2.4
 
 
 # For information on the generic Dart part of this file, see the

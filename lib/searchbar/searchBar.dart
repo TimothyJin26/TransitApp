@@ -463,7 +463,7 @@ class _TransitSearchBarState<T> extends State<TransitSearchBar<T>>
       children: <Widget>[
         Container(
           decoration: BoxDecoration(
-            color: widget.searchBarStyle.surroundingColor,
+            color: widget.searchBarStyle.surroundingColor
           ),
           child: Padding(
             padding: _list.length>0? EdgeInsets.fromLTRB(10, 35, 10, 0): widget.searchBarPadding,
@@ -478,6 +478,10 @@ class _TransitSearchBarState<T> extends State<TransitSearchBar<T>>
                     decoration: BoxDecoration(
                       borderRadius: widget.searchBarStyle.borderRadius,
                       color: widget.searchBarStyle.backgroundColor,
+                      border: Border.all(
+                        color: Colors.black12,
+                        width: 1.0
+                      )
                     ),
                     child: Padding(
                       padding: widget.searchBarStyle.padding,

@@ -53,7 +53,8 @@ class MyTemplate extends BeautifulPopupTemplate {
         child: Container(
           decoration: new BoxDecoration(
             borderRadius: new BorderRadius.circular(16.0),
-            color: getColorFromHex('#0d2036'),
+            //color: getColorFromHex('#0d2036'),
+            color: getColorFromHex('e6e6e6'),
           ),
         ),
       ),
@@ -66,7 +67,7 @@ class MyTemplate extends BeautifulPopupTemplate {
           text: TextSpan(
               text: routeNo,
               style: TextStyle(
-                color: Colors.white70,
+                color: getColorFromHex('#0d2036'),
                 fontWeight: FontWeight.w800,
                 fontSize: 100,
               )),
@@ -105,8 +106,8 @@ class MyTemplate extends BeautifulPopupTemplate {
                       text: TextSpan(
                           text: timeFormatter(trips[index].ExpectedLeaveTime),
                           style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
+                            color: getColorFromHex('#0d2036'),
+                            fontWeight: FontWeight.w600,
                             fontSize: 25,
                           )),
                     ),
@@ -119,7 +120,7 @@ class MyTemplate extends BeautifulPopupTemplate {
                         text: TextSpan(
                             text: "TO " + trips[index].Destination,
                             style: TextStyle(
-                              color: Colors.white,
+                              color: getColorFromHex('#0d2036'),
                               fontWeight: FontWeight.w500,
                               fontSize: 20,
                             )),

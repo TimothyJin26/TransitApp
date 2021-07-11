@@ -7,30 +7,36 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:admob_flutter/admob_flutter.dart';
 import 'package:app_settings/app_settings.dart';
-import 'package:connectivity/connectivity.dart';
-import 'package:flutter/gestures.dart';
-import 'package:flutter_beautiful_popup/main.dart';
-import 'dart:ui' as ui;
 import 'package:carousel_slider/carousel_slider.dart';
-import 'package:flutter/services.dart' show PlatformException, rootBundle;
-
+import 'package:connectivity/connectivity.dart';
+import 'package:daylight/daylight.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart' show PlatformException, rootBundle;
+import 'package:flutter_beautiful_popup/main.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
-import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
+import 'package:transitapp/models/Bus.dart';
 
-//import 'package:location/location.dart';
 import 'package:transitapp/popuptemplates/MyTemplate.dart';
 import 'package:transitapp/searchbar/searchBar.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
+import 'package:transitapp/util/SunsetHelper.dart';
+import 'package:transitapp/util/TransitLiveTimer.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:vibration/vibration.dart';
+import 'package:slide_popup_dialog/slide_popup_dialog.dart' as slideDialog;
+import 'package:url_launcher/url_launcher.dart';
 
-import 'Util.dart';
+import 'WaitTimesPopup.dart';
 import 'fetchers/BusAtStopFetcher.dart';
 import 'fetchers/NextBusesForRouteAtStop.dart';
 import 'fetchers/RouteMapCoordinateHelper.dart';
@@ -52,6 +58,9 @@ class TransitApp extends StatefulWidget {
 /// The widget is rendered based on the state defined here
 ///
 class _TransitAppState extends State<TransitApp> {
+  bool darkModeOn = false;
+
+  //SunsetHelper.isDark();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<PolylineId, Polyline> _mapPolylines = {};
   Timer timer;
@@ -75,14 +84,11 @@ class _TransitAppState extends State<TransitApp> {
   Position userLocation = null;
   List<BothDirectionRouteWithTrips> nextBusesCopy = null;
   List scrollSheetDotListCopy = null;
+  var shouldShowTranslinkOutage = false;
 
   var selectedRouteNo;
   var selectedPattern;
   var selectedStop;
-
-  final String appId = Platform.isAndroid
-      ? 'ca-app-pub-6078575452513504~1720853236'
-      : 'ca-app-pub-6078575452513504~8954310532';
 
   final String bannerUnitId = Platform.isAndroid
 //      ? 'ca-app-pub-3940256099942544/2934735716' // Android banner test ID
@@ -98,7 +104,6 @@ class _TransitAppState extends State<TransitApp> {
   // Markers of buses to display on the home screen (vehicle ID to marker)
   Map<String, Marker> _markers = {};
   bool showingSpecificBuses = false;
-
   bool hasLoaded = false;
 
   void vibrate() async {
@@ -119,14 +124,99 @@ class _TransitAppState extends State<TransitApp> {
     }
   }
 
+  void showAquariumPopup() {
+    slideDialog.showSlideDialog(
+      context: _scaffoldKey.currentContext,
+      child: Expanded(
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, // add this
+
+              children: [
+                new Container(width: 180, height: 180, child: new Image.asset('images/fishcopy.png')),
+                new Container(
+                  alignment: Alignment.center,
+                  margin: EdgeInsets.fromLTRB(10, 15, 5, 15),
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      text:
+                          'Due to the COVID-19 Pandemic, the Vancouver Aquarium paused all public programming. During this time, essential donations would be put towards the critical care of over 70000 animals. 100% of ad revenue from this app goes towards the Vancouver Aquarium',
+                      style: TextStyle(
+                        height: 1.3,
+                        fontWeight: FontWeight.w300,
+                        fontSize: 20,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ),
+                new Center(
+                  child: new ButtonBar(
+                    mainAxisSize: MainAxisSize.min,
+                    // this will take space as minimum as posible(to center)
+                    children: <Widget>[
+                      new ButtonTheme(
+                        minWidth: 150.0,
+                        height: 55.0,
+                        child: RaisedButton(
+                          color: getColorFromHex("256BD1"),
+                          child: new Text(
+                            'Learn More',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                            ),
+                          ),
+                          onPressed: () => {launch('https://www.vanaqua.org/transformation')},
+                        ),
+                      ),
+                      new ButtonTheme(
+                        minWidth: 150.0,
+                        height: 55.0,
+                        child: RaisedButton(
+                          color: getColorFromHex("256BD1"),
+                          child: new Text(
+                            'Donate',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 17,
+                            ),
+                          ),
+                          onPressed: () => {
+                            launch('https://www.vanaqua.org/support/ways-to-support')
+                            // launch('https://secure2.convio.net/vamsc/site/Donation2;jsessionid=00000000.app263a?df_id=3467&mfc_pref=T&3467.donation=form1&NONCE_TOKEN=1AC5E67BD790557439AF933247024A82')
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ]),
+        ),
+      ),
+      barrierColor: Colors.white.withOpacity(0.7),
+      pillColor: Colors.grey,
+      backgroundColor: Colors.white,
+    );
+  }
+
+  void createAquariumMarker() async {
+    ui.Image image = await load('images/Aquarium Marker.png');
+    Future<BitmapDescriptor> a = MarkerHelper.createCustomMarkerBitmapNoText(image, 150, 100);
+    BitmapDescriptor imagea = await a;
+    Marker aquariumMarker = Marker(onTap: showAquariumPopup, markerId: MarkerId("aquarium"), position: LatLng(49.3002649, -123.1311801), icon: imagea);
+    _markers["aquarium"] = aquariumMarker;
+  }
+
+  void clearAndAddAquarium() {
+    _markers.removeWhere((key, value) => key != "aquarium");
+  }
+
   void initWithLocation() {
-    if (timeLastUpdatedForInit == null ||
-        new DateTime.now().difference(timeLastUpdatedForInit).inSeconds > 5) {
+    createAquariumMarker();
+    if (timeLastUpdatedForInit == null || new DateTime.now().difference(timeLastUpdatedForInit).inSeconds > 5) {
       timeLastUpdatedForInit = DateTime.now();
       print("Started initWithLocation");
-//      Location location = new Location();
-//      LocationData locationData;
-//      location.getLocation().then((value) {
       getLocation().then((locationData) {
         userLocation = locationData;
         if (!hasAnimated) {
@@ -136,18 +226,33 @@ class _TransitAppState extends State<TransitApp> {
         setState(() {
           isLocationEnabled = true;
         });
-        print('Found location: ' +
-            locationData.latitude.toString() +
-            ', ' +
-            locationData.longitude.toString());
+        print('Found location: ' + locationData.latitude.toString() + ', ' + locationData.longitude.toString());
 
         // TODO: Update the markers on a regular basis
         //isSelected[0] == false
         if (isSelected[0] == false) {
           print("Starting by updating stops");
-          //updateStops renders stops
-          updateStops(locationData.latitude.toString(),
-              locationData.longitude.toString());
+          // Don't render stops until map has moved
+          // updateStops(locationData.latitude.toString(),
+          //     locationData.longitude.toString());
+
+          // Temporary code
+          // Start with stops showing during Translink outage
+          //
+          // Fetch buses around the user based on the user location
+          LocationFetcher locationFetcher = new LocationFetcher();
+          Future<List<Bus>> future = locationFetcher.fetchAllBuses();
+          future.then((value) => {
+                if (value != null && value.length == 0)
+                  {
+                    // Show Translink outage notification when no buses found
+                    setState(() {
+                      shouldShowTranslinkOutage = true;
+                    })
+                  }
+              });
+          // render the next buses on scrollsheet
+          updateNextBusesForAllNearbyStops();
         } else {
           print("Starting by updating buses");
           updateBuses();
@@ -183,19 +288,13 @@ class _TransitAppState extends State<TransitApp> {
       // Permission Denied
     }
 
-    //Location stuff moved from onMapCreated
-
-//   catch (e) {
-//      // User did not grant location permissions
-//      if (e.code != 'PERMISSION_DENIED') {
-//        throw e;
-//      }
-//    }
+    var brightness = SchedulerBinding.instance.window.platformBrightness;
+    darkModeOn = brightness == Brightness.dark;
 
     WidgetsFlutterBinding.ensureInitialized();
     // Initialize without device test ids.
     Admob.initialize();
-//    Admob.initialize(testDeviceIds: ['F1D272CE815B4D550E263F55298A8A41', 'abed5c3de5e25479dc8213ade8ac8191']);
+    //Admob.initialize(testDeviceIds: ['F1D272CE815B4D550E263F55298A8A41', 'abed5c3de5e25479dc8213ade8ac8191']);
 
     // Wait for the stops to load before checking connectivity and loading buses
     loadListOfStops().then((stops) {
@@ -208,9 +307,7 @@ class _TransitAppState extends State<TransitApp> {
           });
 
           // Listen for connectivity changes, in case user gets internet later
-          subscription = Connectivity()
-              .onConnectivityChanged
-              .listen((ConnectivityResult result) {
+          subscription = Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
             if (result != ConnectivityResult.none) {
               print("Connectivity changed - found connection");
               initWithLocation();
@@ -227,12 +324,10 @@ class _TransitAppState extends State<TransitApp> {
     });
 
     // Updates the bus locations every 30 seconds
-    timer = Timer.periodic(
-        Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
+    timer = Timer.periodic(Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
 
     // Updates the countdown clock every 2 seconds
-    timerShort = Timer.periodic(
-        Duration(seconds: 2), (Timer t) => timerIfSelectedHelperShort());
+    timerShort = Timer.periodic(Duration(seconds: 1), (Timer t) => timerIfSelectedHelperShort());
 
     // TODO: Go to https://stackoverflow.com/questions/49869873/flutter-update-widgets-on-resume
     //       Copy the LifecycleEventHandler class (including imports)
@@ -240,16 +335,17 @@ class _TransitAppState extends State<TransitApp> {
     WidgetsBinding.instance.addObserver(LifecycleEventHandler(
         resumeCallBack: () async => setState(() {
               if (hasLoaded) {
-                print(
-                    "TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED ");
+                print("TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED TIMER RECREATED ");
                 timerIfSelectedHelper();
                 timerIfSelectedHelperShort();
-                timer = Timer.periodic(Duration(seconds: 30),
-                    (Timer t) => timerIfSelectedHelper());
+                timer = Timer.periodic(Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
 
                 // Updates the countdown clock every 2 seconds
-                timerShort = Timer.periodic(Duration(seconds: 2),
-                    (Timer t) => timerIfSelectedHelperShort());
+                timerShort = Timer.periodic(Duration(seconds: 2), (Timer t) => timerIfSelectedHelperShort());
+
+                //   darkModeOn = SunsetHelper.isDark();
+                var brightness = SchedulerBinding.instance.window.platformBrightness;
+                darkModeOn = brightness == Brightness.dark;
 
                 subscription?.resume();
                 positionStream?.resume();
@@ -259,8 +355,7 @@ class _TransitAppState extends State<TransitApp> {
             }),
         suspendingCallBack: () async => setState(() {
               if (hasLoaded) {
-                print(
-                    "TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED ");
+                print("TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED TIMER CANCELED ");
                 timer?.cancel();
                 timerShort?.cancel();
                 subscription?.pause();
@@ -361,23 +456,18 @@ class _TransitAppState extends State<TransitApp> {
 
     for (var i = 0; i < buses.length; i++) {
       Bus bus = buses[i];
-      bitmapFutures
-          .add(MarkerHelper.createCustomMarkerBitmap(bus.RouteNo, i, image));
-//      print("Added bus with route " + bus.RouteNo.toString());
+      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(bus.RouteNo, i, image));
     }
 
     List<BitmapDescriptor> futures = await Future.wait(bitmapFutures);
     for (var i = 0; i < buses.length; i++) {
       Bus bus = buses[i];
-//      print("Parsing bus with route " + bus.RouteNo.toString());
       BitmapDescriptor bitmapDescriptor = futures[i];
       // TODO: Customize marker
       // https://stackoverflow.com/questions/54041830/how-to-add-extra-into-text-into-flutter-google-map-custom-marker
 
       final marker = Marker(
-          //Bus Marker
           onTap: () {
-//            mapController.showMarkerInfoWindow(MarkerId(bus.VehicleNo));
             setState(() {
               _mapPolylines.clear();
             });
@@ -392,8 +482,7 @@ class _TransitAppState extends State<TransitApp> {
               }
             });
           },
-          markerId:
-              MarkerId(bus.VehicleNo + "!" + bus.RouteNo + "!" + bus.Pattern),
+          markerId: MarkerId(bus.VehicleNo + "!" + bus.RouteNo + "!" + bus.Pattern),
           position: LatLng(bus.Latitude - 0.00005, bus.Longitude),
           infoWindow: InfoWindow(
             title: patternHelper(bus.Pattern) + " to " + bus.Destination,
@@ -432,8 +521,7 @@ class _TransitAppState extends State<TransitApp> {
     });
     List<Stop> toRet = new List<Stop>();
     for (Stop s in listOfStops) {
-      if (s.Name.toLowerCase().contains(search.toLowerCase()) ||
-          s.StopNo.toString().contains(search)) {
+      if (s.Name.toLowerCase().contains(search.toLowerCase()) || s.StopNo.toString().contains(search)) {
         counter++;
         Stop newStop = new Stop();
         newStop.StopNo = s.StopNo;
@@ -464,11 +552,9 @@ class _TransitAppState extends State<TransitApp> {
     for (var i = 0; i < stops.length; i++) {
       Stop stop = stops[i];
       if (highlightedStopNo == stops[i].StopNo) {
-        bitmapFutures
-            .add(MarkerHelper.createCustomMarkerBitmapNoText(image, 110, 110));
+        bitmapFutures.add(MarkerHelper.createCustomMarkerBitmapNoText(image, 110, 110));
       } else {
-        bitmapFutures
-            .add(MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75));
+        bitmapFutures.add(MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75));
 //      print("Added bus with route " + bus.RouteNo.toString());
       }
     }
@@ -486,15 +572,13 @@ class _TransitAppState extends State<TransitApp> {
             // On Tap stop marker, update the next buses
             setState(() {
               if (!tappedIntoStop) {
-                nextBusesCopy =
-                    List<BothDirectionRouteWithTrips>.from(nextBuses);
+                nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
                 scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
               }
               tappedIntoStop = true;
               count = 2;
               BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
-              Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
-                  .busAtSingleStopFetcher(stop, stop.StopNo.toString());
+              Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busAtSingleStopFetcher(stop, stop.StopNo.toString());
               futureBuses.then((List<BothDirectionRouteWithTrips> value) {
                 List<BothDirectionRouteWithTrips> buses = value;
                 renderListOfNextBuses(buses);
@@ -542,12 +626,12 @@ class _TransitAppState extends State<TransitApp> {
     // gets next buses from each stop
     List<Stop> stops = listOfStops;
     BusAtStopFetcher busFetcher = new BusAtStopFetcher();
-    Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher
-        .busFetcher(stops, locationData.latitude, locationData.longitude);
+    Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busFetcher(stops, locationData.latitude, locationData.longitude);
     List<BothDirectionRouteWithTrips> buses = await futureBuses;
     renderListOfNextBuses(buses);
     setState(() {
       isLocationEnabled = true;
+      isLoading = false;
     });
   }
 
@@ -566,8 +650,7 @@ class _TransitAppState extends State<TransitApp> {
       var destinationToTrip = new HashMap<String, Trip>();
       for (Trip t in b.Trips) {
         if (destinationToTrip.containsKey(patternHelper(t.Pattern))) {
-          if (t.ExpectedCountdown <
-              destinationToTrip[patternHelper(t.Pattern)].ExpectedCountdown) {
+          if (t.ExpectedCountdown < destinationToTrip[patternHelper(t.Pattern)].ExpectedCountdown) {
             destinationToTrip[patternHelper(t.Pattern)] = t;
           }
         } else {
@@ -575,8 +658,7 @@ class _TransitAppState extends State<TransitApp> {
           directions.add(patternHelper(t.Pattern));
         }
       }
-      BothDirectionRouteWithTrips bitrip =
-          new BothDirectionRouteWithTrips("", []);
+      BothDirectionRouteWithTrips bitrip = new BothDirectionRouteWithTrips("", []);
       bitrip.RouteNo = b.RouteNo;
       for (String s in directions) {
         destinationToTrip[s].RouteNo = b.RouteNo;
@@ -607,7 +689,7 @@ class _TransitAppState extends State<TransitApp> {
     // Sets the state to update the markers on the map
     setState(() {
       isLoading = false;
-      _markers.clear();
+      clearAndAddAquarium();
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
       }
@@ -656,22 +738,18 @@ class _TransitAppState extends State<TransitApp> {
 
     // Sets the state to update the markers on the map
     setState(() {
-      _markers.clear();
+      clearAndAddAquarium();
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
       }
     });
   }
 
-  void updateStopsForMap(double latitude1, double latitude2, double longitude1,
-      double longitude2) async {
-    _markers.clear();
+  void updateStopsForMap(double latitude1, double latitude2, double longitude1, double longitude2) async {
+    clearAndAddAquarium();
     List<Stop> validStops = [];
     for (Stop s in listOfStops) {
-      if (s.Latitude < latitude1 &&
-          s.Latitude > latitude2 &&
-          s.Longitude < longitude1 &&
-          s.Longitude > longitude2) {
+      if (s.Latitude < latitude1 && s.Latitude > latitude2 && s.Longitude < longitude1 && s.Longitude > longitude2) {
         validStops.add(s);
       }
     }
@@ -680,7 +758,7 @@ class _TransitAppState extends State<TransitApp> {
 
     // Sets the state to update the markers on the map
     setState(() {
-      _markers.clear();
+      clearAndAddAquarium();
       for (int i = 0; i < list.length; i++) {
         _markers[list[i].markerId.toString()] = list[i];
       }
@@ -722,13 +800,25 @@ class _TransitAppState extends State<TransitApp> {
   ///
   Future<void> _onMapCreated(GoogleMapController controller) async {
     mapController = controller;
-    mapController.setMapStyle(
-        '[  {    "elementType": "geometry",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "featureType": "administrative.locality",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "poi",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi.park",    "stylers": [      {        "visibility": "on"      }    ]  },  {    "featureType": "poi.park",    "elementType": "geometry",    "stylers": [      {        "color": "#263c3f"      }    ]  },  {    "featureType": "poi.park",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#6b9a76"      }    ]  },  {    "featureType": "road",    "elementType": "geometry",    "stylers": [      {        "color": "#38414e"      }    ]  },  {    "featureType": "road",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#212a37"      },      {        "visibility": "simplified"      },      {        "weight": 2      }    ]  },  {    "featureType": "road",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#9ca5b3"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#1f2835"      }    ]  },  {    "featureType": "road.highway",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#f3d19c"      }    ]  },  {    "featureType": "transit",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "transit",    "elementType": "geometry",    "stylers": [      {        "color": "#2f3948"      }    ]  },  {    "featureType": "transit.station",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "water",    "elementType": "geometry",    "stylers": [      {        "color": "#17263c"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#515c6d"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#17263c"      }    ]  }]');
+    if (darkModeOn) {
+      mapController.setMapStyle(
+          '[  {    "elementType": "geometry",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "featureType": "administrative.locality",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "poi",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi.park",    "stylers": [      {        "visibility": "on"      }    ]  },  {    "featureType": "poi.park",    "elementType": "geometry",    "stylers": [      {        "color": "#263c3f"      }    ]  },  {    "featureType": "poi.park",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#6b9a76"      }    ]  },  {    "featureType": "road",    "elementType": "geometry",    "stylers": [      {        "color": "#38414e"      }    ]  },  {    "featureType": "road",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#212a37"      },      {        "visibility": "simplified"      },      {        "weight": 2      }    ]  },  {    "featureType": "road",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#9ca5b3"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#1f2835"      }    ]  },  {    "featureType": "road.highway",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#f3d19c"      }    ]  },  {    "featureType": "transit",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "transit",    "elementType": "geometry",    "stylers": [      {        "color": "#2f3948"      }    ]  },  {    "featureType": "transit.station",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "water",    "elementType": "geometry",    "stylers": [      {        "color": "#17263c"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#515c6d"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#17263c"      }    ]  }]');
+    } else {
+      mapController.setMapStyle("[]");
+    }
     // Find the current location of the user
     _currentLocation();
   }
 
 // https://stackoverflow.com/questions/52569602/flutter-run-function-every-x-amount-of-seconds
+
+  Future openWaitTimesPopup(String routeNo, String pattern, String stopNo) async {
+    await Navigator.of(_scaffoldKey.currentContext).push(new MaterialPageRoute<void>(
+        builder: (BuildContext context) {
+          return new WaitTimesPopup(removeZeroes(routeNo), patternHelper(pattern), stopNo);
+        },
+        fullscreenDialog: true));
+  }
 
   void _currentLocation() async {
     if (mapController == null) {
@@ -740,15 +830,10 @@ class _TransitAppState extends State<TransitApp> {
     }
 
     final GoogleMapController controller = mapController;
-//    Position currentLocation;
     try {
       setState(() {
         isLocationEnabled = true;
       });
-//      currentLocation = await location.getLocation();
-//      currentLocation = await getCurrentPosition(
-////        locationPermissionLevel: GeolocationPermission.locationWhenInUse,
-//      );
       setState(() {
         isLocationOnMapEnabled = true;
       });
@@ -758,7 +843,7 @@ class _TransitAppState extends State<TransitApp> {
         CameraPosition(
           bearing: 0,
           target: LatLng(userLocation.latitude, userLocation.longitude),
-          zoom: 17.0,
+          zoom: 16.0,
         ),
       ));
     } on Exception {
@@ -782,6 +867,7 @@ class _TransitAppState extends State<TransitApp> {
           GoogleMap(
             myLocationEnabled: isLocationOnMapEnabled,
             myLocationButtonEnabled: false,
+            compassEnabled: false,
             onMapCreated: _onMapCreated,
             initialCameraPosition: CameraPosition(
               target: const LatLng(49.2418584, -123.1401792),
@@ -798,13 +884,8 @@ class _TransitAppState extends State<TransitApp> {
                     //hiding stop markers while getting buses
                     return false;
                   }
-                  if (marker.markerId.toString().split('!')[1] ==
-                          removeZeroes(selectedRouteNo) &&
-                      marker.markerId
-                              .toString()
-                              .split('!')[2]
-                              .substring(0, 1) ==
-                          selectedPattern.substring(0, 1)) {
+                  if (marker.markerId.toString().split('!')[1] == removeZeroes(selectedRouteNo) &&
+                      marker.markerId.toString().split('!')[2].substring(0, 1) == selectedPattern.substring(0, 1)) {
                     return true;
                   } else {
                     return false;
@@ -823,7 +904,6 @@ class _TransitAppState extends State<TransitApp> {
                   nextBuses = nextBusesCopy;
                   scrollSheetDotList = scrollSheetDotListCopy;
                 }
-                if (isSelected[1] == true) {}
                 _mapPolylines.clear();
               });
             },
@@ -854,15 +934,13 @@ class _TransitAppState extends State<TransitApp> {
                 child: RichText(
                     text: TextSpan(
                         style: TextStyle(
-                            fontWeight: FontWeight.w300,
-                            fontStyle: FontStyle.normal,
-                            fontSize: 18),
+                            color: darkModeOn ? Colors.white70 : Colors.black54, fontWeight: FontWeight.w300, fontStyle: FontStyle.normal, fontSize: 18),
                         text: 'Zoom in to see stops'))),
           ),
           Visibility(
             visible: !showingSpecificBuses,
             child: Positioned(
-              top: 110,
+              top: 105,
               right: 7,
               left: 7,
               child: Align(
@@ -870,13 +948,14 @@ class _TransitAppState extends State<TransitApp> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: getColorFromHex('cfd1d4'),
-                    border: Border.all(color: Colors.black, width: 1.0),
-                    borderRadius: BorderRadius.all(Radius.circular(10)),
+                    // border: Border.all(color: Colors.black, width: 1.0),
+                    borderRadius: BorderRadius.all(Radius.circular(20)),
                   ),
                   child: ToggleButtons(
-                    fillColor: getColorFromHex('e8eaed'),
+                    //fillColor: getColorFromHex('e8eaed'),
+                    fillColor: Colors.white,
                     disabledColor: Colors.red,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(20),
                     children: <Widget>[
                       Icon(Icons.directions_bus),
                       Icon(Icons.pin_drop),
@@ -886,8 +965,7 @@ class _TransitAppState extends State<TransitApp> {
                     onPressed: (int index) {
                       // Do some work (e.g. check sif the tap is valid)
                       vibrate();
-                      if (nextBusesCopy != null &&
-                          scrollSheetDotListCopy != null) {
+                      if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
                         nextBuses = nextBusesCopy;
                         scrollSheetDotList = scrollSheetDotListCopy;
                       }
@@ -903,9 +981,7 @@ class _TransitAppState extends State<TransitApp> {
                         getLocationAndUpdateStops();
                       }
                       setState(() {
-                        for (int buttonIndex = 0;
-                            buttonIndex < isSelected.length;
-                            buttonIndex++) {
+                        for (int buttonIndex = 0; buttonIndex < isSelected.length; buttonIndex++) {
                           if (buttonIndex == index) {
                             isSelected[buttonIndex] = true;
                           } else {
@@ -923,7 +999,7 @@ class _TransitAppState extends State<TransitApp> {
           Visibility(
             visible: !showingSpecificBuses,
             child: Positioned(
-              top: 168,
+              top: 162,
               right: 7,
               left: 7,
               child: Align(
@@ -933,16 +1009,40 @@ class _TransitAppState extends State<TransitApp> {
                   width: 50,
                   child: FittedBox(
                     child: FloatingActionButton(
+                      heroTag: "subway",
                       onPressed: () {
                         _currentLocation();
                       },
                       child: Icon(
                         Icons.my_location,
                         size: 24,
-                        color: Color.fromRGBO(255, 255, 255, 0.9),
+                        color: Color.fromRGBO(0, 0, 0, 1),
                       ),
-                      backgroundColor: Color.fromRGBO(255, 255, 255, 0.1),
+                      backgroundColor: Color.fromRGBO(255, 255, 255, 1),
                     ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 105,
+            left: 10,
+            child: Align(
+              alignment: Alignment.bottomRight,
+              child: Container(
+                height: 50,
+                width: 50,
+                child: FittedBox(
+                  child: FloatingActionButton(
+                    heroTag: "vanaqua",
+                    onPressed: () {
+                      showAquariumPopup();
+                    },
+                    child: IconButton(
+                      icon: new Image.asset('images/Aquarium Marker.png'),
+                    ),
+                    backgroundColor: Color.fromRGBO(255, 255, 255, 1),
                   ),
                 ),
               ),
@@ -960,7 +1060,8 @@ class _TransitAppState extends State<TransitApp> {
                     child: Stack(children: [
                       Container(
                         margin: const EdgeInsets.fromLTRB(0.0, 27.0, 0.0, 0.0),
-                        color: getColorFromHex('e8eaed').withOpacity(0.99),
+                        //color: getColorFromHex('e8eaed').withOpacity(0.99),
+                        color: darkModeOn ? getColorFromHex("1b2336").withOpacity(0.99) : Colors.white.withOpacity(0.99),
                         child: Stack(children: [
                           AnimatedOpacity(
                             opacity: nextBuses.length > 0 ? 1.0 : 0.0,
@@ -977,8 +1078,7 @@ class _TransitAppState extends State<TransitApp> {
                                       options: CarouselOptions(
                                         onPageChanged: (carouselIndex, reason) {
                                           setState(() {
-                                            scrollSheetDotList[index] =
-                                                carouselIndex;
+                                            scrollSheetDotList[index] = carouselIndex;
                                           });
                                         },
                                         height: 64.0,
@@ -989,178 +1089,59 @@ class _TransitAppState extends State<TransitApp> {
                                           builder: (BuildContext context) {
                                             return InkWell(
                                                 onTap: () {
-                                                  NextBusesForRouteAtStop
-                                                      busFetcher =
-                                                      new NextBusesForRouteAtStop();
-                                                  Future<List<Trip>>
-                                                      futureBuses = busFetcher
-                                                          .busAtSingleStopFetcher(
-                                                              trip.StopNo,
-                                                              nextBuses[index]
-                                                                  .RouteNo);
-                                                  futureBuses
-                                                      .then((List<Trip> value) {
-                                                    final popup = BeautifulPopup
-                                                        .customize(
-                                                            context: _scaffoldKey
-                                                                .currentContext,
-                                                            build: (options) {
-                                                              MyTemplate template = MyTemplate(
-                                                                  options,
-                                                                  removeZeroes(
-                                                                      nextBuses[
-                                                                              index]
-                                                                          .RouteNo),
-                                                                  patternHelper(
-                                                                      trip.Pattern),
-                                                                  trip.StopNo,
-                                                                  value);
-                                                              return template;
-                                                            });
-                                                    popup.show(
-                                                      title: 'Example',
-                                                      content: Container(
-                                                        color: Colors.black12,
-                                                        child: Text(
-                                                            'This popup shows you how to customize your own BeautifulPopupTemplate.'),
-                                                      ),
-                                                      actions: [
-                                                        popup.button(
-                                                            label:
-                                                                'Show buses on map',
-                                                            onPressed: () {
-                                                              showingSpecificBuses =
-                                                                  true;
-                                                              Navigator.of(
-                                                                      _scaffoldKey
-                                                                          .currentContext)
-                                                                  .pop();
-                                                              filterBuses(
-                                                                  nextBuses[
-                                                                          index]
-                                                                      .RouteNo,
-                                                                  trip.Pattern,
-                                                                  trip.StopNo);
-                                                            }),
-                                                      ],
-                                                    );
-                                                  });
+                                                  openWaitTimesPopup(nextBuses[index].RouteNo, trip.Pattern, trip.StopNo);
                                                 },
                                                 child: Column(
                                                   children: <Widget>[
                                                     Row(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
+                                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                       children: <Widget>[
                                                         Container(
                                                           width: 70,
-                                                          margin:
-                                                              const EdgeInsets
-                                                                      .only(
-                                                                  right: 0,
-                                                                  left: 0),
+                                                          margin: const EdgeInsets.only(right: 0, left: 0),
                                                           child: Text(
-                                                            removeZeroes(
-                                                                nextBuses[index]
-                                                                    .RouteNo),
-                                                            textAlign: TextAlign
-                                                                .center,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
+                                                            removeZeroes(nextBuses[index].RouteNo),
+                                                            textAlign: TextAlign.center,
+                                                            overflow: TextOverflow.ellipsis,
                                                             style: TextStyle(
-                                                              fontSize:
-                                                                  removeZeroes(nextBuses[index].RouteNo)
-                                                                              .length <
-                                                                          3
-                                                                      ? 50
-                                                                      : 35,
+                                                              fontSize: removeZeroes(nextBuses[index].RouteNo).length < 3 ? 50 : 35,
                                                               height: 1.0,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
-                                                              color:
-                                                                  getColorFromHex(
-                                                                      '#10295D'),
+                                                              fontWeight: FontWeight.w700,
+                                                              color: darkModeOn ? Colors.white70 : getColorFromHex('#10295D'),
                                                             ),
                                                           ),
                                                         ),
                                                         Expanded(
                                                           child: Column(
-                                                            crossAxisAlignment:
-                                                                CrossAxisAlignment
-                                                                    .start,
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
                                                             children: <Widget>[
                                                               Container(
-                                                                margin:
-                                                                    const EdgeInsets
-                                                                            .only(
-                                                                        left:
-                                                                            15),
+                                                                margin: const EdgeInsets.only(left: 15),
                                                                 child: Text(
-                                                                  nextBuses[
-                                                                          index]
-                                                                      .Trips[scrollSheetDotList[
-                                                                          index]]
-                                                                      .Destination,
-                                                                  textAlign:
-                                                                      TextAlign
-                                                                          .left,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis,
-                                                                  style:
-                                                                      TextStyle(
-                                                                    fontSize:
-                                                                        18,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w700,
+                                                                  nextBuses[index].Trips[scrollSheetDotList[index]].Destination,
+                                                                  textAlign: TextAlign.left,
+                                                                  overflow: TextOverflow.ellipsis,
+                                                                  style: TextStyle(
+                                                                    fontSize: 18,
+                                                                    fontWeight: FontWeight.w700,
                                                                     height: 1.0,
-                                                                    color: getColorFromHex(
-                                                                        '#024D7E'),
+                                                                    color: darkModeOn ? Colors.white70 : getColorFromHex('#024D7E'),
                                                                   ),
                                                                 ),
                                                               ),
                                                               Container(
-                                                                margin:
-                                                                    const EdgeInsets
-                                                                            .only(
-                                                                        left:
-                                                                            15),
+                                                                margin: const EdgeInsets.only(left: 15),
                                                                 child: Text(
-                                                                  patternHelper(nextBuses[
-                                                                              index]
-                                                                          .Trips[scrollSheetDotList[
-                                                                              index]]
-                                                                          .Pattern) +
+                                                                  patternHelper(nextBuses[index].Trips[scrollSheetDotList[index]].Pattern) +
                                                                       " at \n" +
-                                                                      nextBuses[
-                                                                              index]
-                                                                          .Trips[
-                                                                              scrollSheetDotList[index]]
-                                                                          .nextStop
-                                                                          .toString(),
-                                                                  textAlign:
-                                                                      TextAlign
-                                                                          .left,
-                                                                  overflow:
-                                                                      TextOverflow
-                                                                          .ellipsis,
+                                                                      nextBuses[index].Trips[scrollSheetDotList[index]].nextStop.toString(),
+                                                                  textAlign: TextAlign.left,
+                                                                  overflow: TextOverflow.ellipsis,
                                                                   style: TextStyle(
-                                                                      fontSize:
-                                                                          15,
-                                                                      height:
-                                                                          1.0,
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w400,
-                                                                      color: Colors
-                                                                          .deepOrange),
+                                                                      fontSize: 15, height: 1.0, fontWeight: FontWeight.w400, color: getColorFromHex("ff6505")
+                                                                      //Colors.deepOrange
+                                                                      ),
                                                                 ),
                                                               ),
                                                             ],
@@ -1169,35 +1150,17 @@ class _TransitAppState extends State<TransitApp> {
                                                         Container(
                                                           width: 83,
                                                           child: Text(
-                                                            nextBuses[index]
-                                                                    .Trips[scrollSheetDotList[
-                                                                        index]]
-                                                                    .ExpectedCountdown
-                                                                    .toString() +
-                                                                " min",
-                                                            textAlign: TextAlign
-                                                                .center,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
+                                                            nextBuses[index].Trips[scrollSheetDotList[index]].ExpectedCountdown.toString() + " min",
+                                                            textAlign: TextAlign.center,
+                                                            overflow: TextOverflow.ellipsis,
                                                             style: TextStyle(
-                                                              fontSize: nextBuses[
-                                                                              index]
-                                                                          .Trips[
-                                                                              scrollSheetDotList[index]]
-                                                                          .ExpectedCountdown
-                                                                          .toString()
-                                                                          .length <
-                                                                      3
-                                                                  ? 24
-                                                                  : 20,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w700,
+                                                              fontSize:
+                                                                  nextBuses[index].Trips[scrollSheetDotList[index]].ExpectedCountdown.toString().length < 3
+                                                                      ? 24
+                                                                      : 20,
+                                                              fontWeight: FontWeight.w700,
                                                               height: 1.0,
-                                                              color:
-                                                                  getColorFromHex(
-                                                                      '#10295D'),
+                                                              color: darkModeOn ? Colors.white70 : getColorFromHex('#10295D'),
                                                             ),
                                                           ),
                                                         )
@@ -1210,25 +1173,18 @@ class _TransitAppState extends State<TransitApp> {
                                       }).toList(),
                                     ),
                                     Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: nextBuses[index]
-                                          .Trips
-                                          .asMap()
-                                          .entries
-                                          .map((url) {
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: nextBuses[index].Trips.asMap().entries.map((url) {
                                         int itemIndex = url.key;
                                         return Container(
                                           width: 6.0,
                                           height: 5.0,
-                                          margin: EdgeInsets.symmetric(
-                                              vertical: 2.0, horizontal: 2.0),
+                                          margin: EdgeInsets.symmetric(vertical: 2.0, horizontal: 2.0),
                                           decoration: BoxDecoration(
                                             shape: BoxShape.circle,
-                                            color: scrollSheetDotList[index] ==
-                                                    itemIndex
-                                                ? Color.fromRGBO(0, 0, 0, 0.3)
-                                                : Color.fromRGBO(0, 0, 0, 0.15),
+                                            color: scrollSheetDotList[index] == itemIndex
+                                                ? (darkModeOn ? Color.fromRGBO(255, 255, 255, 0.3) : Color.fromRGBO(0, 0, 0, 0.3))
+                                                : (darkModeOn ? Color.fromRGBO(255, 255, 255, 0.15) : Color.fromRGBO(0, 0, 0, 0.15)),
                                           ),
                                         );
                                       }).toList(),
@@ -1242,50 +1198,32 @@ class _TransitAppState extends State<TransitApp> {
                             ),
                           ),
                           Center(
-                            child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  AnimatedOpacity(
-                                      opacity:
-                                          nextBuses.length == 0 ? 1.0 : 0.0,
-                                      duration: Duration(milliseconds: 20),
-                                      child: Align(
-                                        alignment: Alignment.center,
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              AnimatedOpacity(
+                                  opacity: nextBuses.length == 0 ? 1.0 : 0.0,
+                                  duration: Duration(milliseconds: 20),
+                                  child: Align(
+                                    alignment: Alignment.center,
+                                    child: RichText(
+                                        text: TextSpan(
+                                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500, fontStyle: FontStyle.normal, fontSize: 19),
+                                            text: scrollsheetText)),
+                                  )),
+                              Visibility(
+                                  visible: !isLocationEnabled,
+                                  child: Flexible(
+                                    child: Container(
+                                        padding: EdgeInsets.fromLTRB(35, 10, 30, 0),
                                         child: RichText(
                                             text: TextSpan(
-                                                style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontWeight: FontWeight.w500,
-                                                    fontStyle: FontStyle.normal,
-                                                    fontSize: 19),
-                                                text: scrollsheetText)),
-                                      )),
-                                  Visibility(
-                                      visible: !isLocationEnabled,
-                                      child: Flexible(
-                                        child: Container(
-                                            padding: EdgeInsets.fromLTRB(
-                                                35, 10, 30, 0),
-                                            child: RichText(
-                                                text: TextSpan(
-                                                    recognizer:
-                                                        TapGestureRecognizer()
-                                                          ..onTap = () {
-                                                            AppSettings
-                                                                .openLocationSettings();
-                                                          },
-                                                    style: TextStyle(
-                                                        color: Colors.black,
-                                                        fontWeight:
-                                                            FontWeight.w300,
-                                                        fontStyle:
-                                                            FontStyle.normal,
-                                                        fontSize: 16),
-                                                    text: !tappedIntoStop
-                                                        ? "Please allow Transit to access your location to improve your experience"
-                                                        : ""))),
-                                      )),
-                                ]),
+                                                recognizer: TapGestureRecognizer()
+                                                  ..onTap = () {
+                                                    AppSettings.openLocationSettings();
+                                                  },
+                                                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w300, fontStyle: FontStyle.normal, fontSize: 16),
+                                                text: !tappedIntoStop ? "Please allow Transit to access your location to improve your experience" : ""))),
+                                  )),
+                            ]),
                           ),
                         ]),
                       ),
@@ -1296,6 +1234,7 @@ class _TransitAppState extends State<TransitApp> {
                           width: 24,
                           child: FittedBox(
                             child: FloatingActionButton(
+                              heroTag: "pizzahut",
                               onPressed: () {
                                 if (!tappedIntoStop) {
                                   updateNextBusesForAllNearbyStops();
@@ -1316,44 +1255,8 @@ class _TransitAppState extends State<TransitApp> {
                       ),
                       Positioned(
                           right: 0.0,
-                          child: Container(
-                            width: 65.0,
-                            height: 25.0,
-                            decoration: new BoxDecoration(
-                                color: Colors.grey,
-                                shape: BoxShape.rectangle,
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(8.0))),
-                            child: Align(
-                                alignment: Alignment.center,
-                                child: RichText(
-                                    text: TextSpan(children: [
-                                  WidgetSpan(
-                                      child: isLoading
-                                          ? SizedBox(
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                backgroundColor: Colors.orange,
-                                              ),
-                                              height: 15,
-                                              width: 15,
-                                            )
-                                          : Icon(
-                                              Icons.rss_feed,
-                                              size: 16,
-                                            )),
-                                  !isLoading
-                                      ? TextSpan(
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.w400,
-                                              fontStyle: FontStyle.normal,
-                                              fontSize: 13),
-                                          text: ((30 - timeDifference.inSeconds)
-                                                  .toString()) +
-                                              " sec")
-                                      : TextSpan(text: ""),
-                                ]))),
-                          )),
+                          child: TransitLiveTimer(isLoading,timeDifference),
+                      ),
                     ]));
               },
             ),
@@ -1391,9 +1294,10 @@ class _TransitAppState extends State<TransitApp> {
               searchBarPadding: EdgeInsets.fromLTRB(10, 20, 10, 0),
               searchBarStyle: SearchBarStyle(
                 searchBarHeight: 52,
-                backgroundColor: getColorFromHex('e8eaed'),
+                //backgroundColor: getColorFromHex('e8eaed'),
+                backgroundColor: Colors.white,
                 padding: EdgeInsets.fromLTRB(10, 0, 0, 0),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(20),
               ),
               onSearch: search,
               onCancelled: () {
@@ -1409,13 +1313,7 @@ class _TransitAppState extends State<TransitApp> {
               },
               emptyWidget: Align(
                 alignment: Alignment.center,
-                child: RichText(
-                    text: TextSpan(
-                        style: TextStyle(
-                            color: Colors.black87,
-                            fontStyle: FontStyle.normal,
-                            fontSize: 18),
-                        text: 'No Stops Found')),
+                child: RichText(text: TextSpan(style: TextStyle(color: Colors.black87, fontStyle: FontStyle.normal, fontSize: 18), text: 'No Stops Found')),
               ),
               onItemFound: (Stop post, int index) {
                 return ListTile(
@@ -1425,34 +1323,24 @@ class _TransitAppState extends State<TransitApp> {
                     setState(() {
                       //makes sure not to clone the wrong list
                       if (!tappedIntoStop) {
-                        nextBusesCopy =
-                            List<BothDirectionRouteWithTrips>.from(nextBuses);
-                        scrollSheetDotListCopy =
-                            List<dynamic>.from(scrollSheetDotList);
+                        nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+                        scrollSheetDotListCopy = List<dynamic>.from(scrollSheetDotList);
                       }
                       tappedIntoStop = true;
                       isSelected = [false, true];
-                      BusAtSingleStopFetcher busFetcher =
-                          new BusAtSingleStopFetcher();
-                      Future<List<BothDirectionRouteWithTrips>> futureBuses =
-                          busFetcher.busAtSingleStopFetcher(
-                              post, post.StopNo.toString());
-                      futureBuses
-                          .then((List<BothDirectionRouteWithTrips> value) {
+                      BusAtSingleStopFetcher busFetcher = new BusAtSingleStopFetcher();
+                      Future<List<BothDirectionRouteWithTrips>> futureBuses = busFetcher.busAtSingleStopFetcher(post, post.StopNo.toString());
+                      futureBuses.then((List<BothDirectionRouteWithTrips> value) {
                         print(value.toString());
                         renderListOfNextBuses(value);
                       });
                     });
                     searchBarController.clear();
-                    CameraPosition _kLake = CameraPosition(
-                        target: LatLng(post.Latitude, post.Longitude),
-                        zoom: 18);
+                    CameraPosition _kLake = CameraPosition(target: LatLng(post.Latitude, post.Longitude), zoom: 18);
                     highlightedStopNo = post.StopNo;
                     count = 2;
-                    updateStops(
-                        post.Latitude.toString(), post.Longitude.toString());
-                    mapController
-                        .animateCamera(CameraUpdate.newCameraPosition(_kLake));
+                    updateStops(post.Latitude.toString(), post.Longitude.toString());
+                    mapController.animateCamera(CameraUpdate.newCameraPosition(_kLake));
                   },
                 );
               },
@@ -1471,6 +1359,7 @@ class _TransitAppState extends State<TransitApp> {
                   width: 70,
                   child: FittedBox(
                     child: FloatingActionButton(
+                      heroTag: "mcdonalds",
                       onPressed: () {
                         showingSpecificBuses = false;
                         selectedRouteNo = null;
@@ -1496,43 +1385,91 @@ class _TransitAppState extends State<TransitApp> {
             child: Align(
               alignment: Alignment.center,
               child: AdmobBanner(
-                adUnitId: bannerUnitId,
-                adSize: AdmobBannerSize.BANNER,
-                nonPersonalizedAds: true,
-                listener: (AdmobAdEvent event, Map<String, dynamic> args) {
-                  switch (event) {
-                    case AdmobAdEvent.loaded:
-                      print("[Transit Ads] Loaded");
-                      break;
-                    case AdmobAdEvent.opened:
-                      print("[Transit Ads] Opened");
-                      break;
-                    case AdmobAdEvent.closed:
-                      print("[Transit Ads] Closed");
-                      break;
-                    case AdmobAdEvent.failedToLoad:
-                      print("[Transit Ads] Admob banner failed to load. Error code: ${args['errorCode']}");
-                      break;
-                    case AdmobAdEvent.clicked:
-                      print("[Transit Ads] Clicked");
-                      break;
-                    case AdmobAdEvent.impression:
-                      print("[Transit Ads] Impression");
-                      break;
-                    case AdmobAdEvent.leftApplication:
-                      print("[Transit Ads] Left Application");
-                      break;
-                    case AdmobAdEvent.completed:
-                      print("[Transit Ads] Completed");
-                      break;
-                    case AdmobAdEvent.rewarded:
-                      print("[Transit Ads] Reward");
-                      break;
-                    case AdmobAdEvent.started:
-                      print("[Transit Ads] Started");
-                      break;
-                  }
-                }
+                  adUnitId: bannerUnitId,
+                  adSize: AdmobBannerSize.BANNER,
+                  nonPersonalizedAds: Platform.isAndroid ? false : true,
+                  listener: (AdmobAdEvent event, Map<String, dynamic> args) {
+                    switch (event) {
+                      case AdmobAdEvent.loaded:
+                        print("[Transit Ads] Loaded");
+                        break;
+                      case AdmobAdEvent.opened:
+                        print("[Transit Ads] Opened");
+                        break;
+                      case AdmobAdEvent.closed:
+                        print("[Transit Ads] Closed");
+                        break;
+                      case AdmobAdEvent.failedToLoad:
+                        print("[Transit Ads] Admob banner failed to load. Error code: ${args['errorCode']}");
+                        break;
+                      case AdmobAdEvent.clicked:
+                        print("[Transit Ads] Clicked");
+                        break;
+                      case AdmobAdEvent.impression:
+                        print("[Transit Ads] Impression");
+                        break;
+                      case AdmobAdEvent.leftApplication:
+                        print("[Transit Ads] Left Application");
+                        break;
+                      case AdmobAdEvent.completed:
+                        print("[Transit Ads] Completed");
+                        break;
+                      case AdmobAdEvent.rewarded:
+                        print("[Transit Ads] Reward");
+                        break;
+                      case AdmobAdEvent.started:
+                        print("[Transit Ads] Started");
+                        break;
+                    }
+                  }),
+            ),
+          ),
+          Visibility(
+            visible: shouldShowTranslinkOutage && isSelected[0],
+            // Display only on the "buses" tab
+            child: Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Align(
+                alignment: Alignment.center,
+                child: Card(
+                  child: Column(
+                    children: <Widget>[
+                      SizedBox(height: 10),
+                      ListTile(
+                        // leading: Icon(Icons.bus_alert),
+                        title: Text('Bus Locations Temporarily Unavailable'),
+                        subtitle: Text('Due to the ongoing Translink IT outage, only next stop times are available.'),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: <Widget>[
+                          TextButton(
+                            child: const Text('Learn More'),
+                            onPressed: () {
+                              const url = "https://www.translink.ca/news/2020/december/statement%20from%20translink%20ceo%20kevin%20desmond";
+                              canLaunch(url).then((result) => {
+                                    if (result) {launch(url).then((value) => null)}
+                                  });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            child: const Text('Dismiss'),
+                            onPressed: () {
+                              setState(() {
+                                // User got the message, no need to show anymore
+                                shouldShowTranslinkOutage = false;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -1544,12 +1481,11 @@ class _TransitAppState extends State<TransitApp> {
       if (value >= 14) {
         zoomBool = false;
         mapController.getVisibleRegion().then((value) {
-          updateStopsForMap(value.northeast.latitude, value.southwest.latitude,
-              value.northeast.longitude, value.southwest.longitude);
+          updateStopsForMap(value.northeast.latitude, value.southwest.latitude, value.northeast.longitude, value.southwest.longitude);
         });
       } else {
         setState(() {
-          _markers.clear();
+          clearAndAddAquarium();
           zoomBool = true;
         });
       }
@@ -1565,8 +1501,7 @@ class _TransitAppState extends State<TransitApp> {
       updateBuses();
     }
     load('images/StopIcon.png').then((image) {
-      MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75)
-          .then((bitmapDescriptor) {
+      MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75).then((bitmapDescriptor) {
         double latitude;
         double longitude;
         String stopName;
