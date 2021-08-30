@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../home.dart';
+
 class TransitLiveTimer extends StatefulWidget {
   final bool isLoading;
   final Duration timeDifference;
@@ -29,7 +31,7 @@ class _TransitLiveTimer extends State<TransitLiveTimer> {
                         ? SizedBox(
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        backgroundColor: Colors.orange,
+                        backgroundColor: getColorFromHex("1bab65"),
                       ),
                       height: 15,
                       width: 15,

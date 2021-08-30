@@ -10,6 +10,7 @@
 1. Click "Runner" and you should see the project properties. 
 1. Increment the version and build number.
 1. Change the Target to be: `Runner > Any iOS Device`.
+1. `cd ~/Documents/Apps/transitapp/ios/` in terminal
 1. Run `flutter build ios`
 1. Build a new archive: `Product > Archive`.
 1. Distribute App. Leave all the default options.

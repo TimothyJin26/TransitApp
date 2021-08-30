@@ -1139,7 +1139,7 @@ class _TransitAppState extends State<TransitApp> {
                                                                   textAlign: TextAlign.left,
                                                                   overflow: TextOverflow.ellipsis,
                                                                   style: TextStyle(
-                                                                      fontSize: 15, height: 1.0, fontWeight: FontWeight.w400, color: getColorFromHex("ff6505")
+                                                                      fontSize: 15, height: 1.0, fontWeight: FontWeight.w400, color: getColorFromHex("1bab65")
                                                                       //Colors.deepOrange
                                                                       ),
                                                                 ),
