@@ -1,108 +1,79 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
-import 'package:json_annotation/json_annotation.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
+import 'package:http/http.dart' as http;
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
+import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/models/Trip.dart';
 
 class BusAtStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busFetcher(
-      List<Stop> stopList, double Lat, double Lng) async {
-    print(DateTime.now().toString() + " START OF BUS FETCHER at " + Lat.toString() + " ; " + Lng.toString() + " and stoplist of size " + stopList.length.toString());
-    List<BothDirectionRouteWithTrips> routeTrips = new List<BothDirectionRouteWithTrips>(); // Gets stops that are closest to the user
-    List<Stop> shortestDistance = new List<Stop>();
+      List<Stop> stopList, double lat, double lng) async {
+    final List<BothDirectionRouteWithTrips> routeTrips = [];
+
+    // Sort stops by distance and take the 6 closest
     stopList.sort((a, b) {
-      var distanceLatA = pow(a.Latitude - Lat, 2);
-      var distanceLatB = pow(b.Latitude - Lat, 2);
-      var distanceLongA = pow(a.Longitude - Lng, 2);
-      var distanceLongB = pow(b.Longitude - Lng, 2);
-      var distanceA = sqrt(distanceLatA + distanceLongA);
-      var distanceB = sqrt(distanceLatB + distanceLongB);
+      final distanceA = sqrt(pow((a.Latitude ?? 0) - lat, 2) +
+          pow((a.Longitude ?? 0) - lng, 2));
+      final distanceB = sqrt(pow((b.Latitude ?? 0) - lat, 2) +
+          pow((b.Longitude ?? 0) - lng, 2));
       return distanceA.compareTo(distanceB);
     });
 
-    shortestDistance = stopList.sublist(0, min(stopList.length, 6));
+    final List<Stop> shortestDistance =
+        stopList.sublist(0, min(stopList.length, 6));
 
-    //  Go through every stop to fetch the next buses
+    final Map<String, String> requestHeaders = {'Accept': 'application/json'};
 
-    List<Future<Response>> futures = [];
+    // Fire all requests in parallel
+    final List<Future<http.Response>> futures = shortestDistance
+        .map((stop) => http.get(
+              Uri.parse(
+                'https://api.translink.ca/rttiapi/v1/stops/'
+                '${stop.StopNo}/estimates?apikey=perA9biw6Ipc8aobcMa3',
+              ),
+              headers: requestHeaders,
+            ))
+        .toList();
 
-    for (Stop stop in shortestDistance) {
-      String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/' +
-          stop.StopNo.toString() +
-          '/estimates?apikey=perA9biw6Ipc8aobcMa3';
-      Map<String, String> requestHeaders = {
-        'Accept': 'application/json',
-      };
-
-      futures.add(http.get(stopLocationsURL, headers: requestHeaders));
-      print("GETTING STOP " + stop.StopNo.toString() + " " + stop.Name);
-    }
-    var counter = 0;
-    for(Future<Response> r in futures) {
-      Response response = await r;
+    for (int counter = 0; counter < futures.length; counter++) {
+      final response = await futures[counter];
       if (response.statusCode == 200) {
-        List<dynamic> jsonStops = (json.decode(response.body) as List);
-        for (int i = 0; i < jsonStops.length; i++) {
-          // Go through each of the next buses for the stop
-          SingleDirectionRouteWithTrips routeObjects =
-              SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
-          var remove = [];
-          int count = 0;
-          for (Trip t in routeObjects.Schedules) {
-            if(t.ExpectedCountdown<0){
-              //removes negative countdowns
-              remove.add(count);
+        final List<dynamic> jsonStops = json.decode(response.body) as List;
+        for (final dynamic item in jsonStops) {
+          final SingleDirectionRouteWithTrips routeObjects =
+              SingleDirectionRouteWithTrips.fromJson(
+                  item as Map<String, dynamic>);
+
+          final Stop currentStop = shortestDistance[counter];
+          final List<Trip> validSchedules = [];
+          for (final Trip t in routeObjects.Schedules ?? []) {
+            if ((t.ExpectedCountdown ?? 0) < 0) continue;
+            if (currentStop.AtStreet == null || currentStop.OnStreet == null) {
+              t.nextStop = currentStop.Name;
+            } else {
+              final String onStreet = currentStop.OnStreet!.trim();
+              final int spaceIdx = onStreet.indexOf(' ');
+              t.nextStop =
+                  '${currentStop.AtStreet!.trim()} and \n${spaceIdx >= 0 ? onStreet.substring(spaceIdx + 1) : onStreet}';
             }
-            if (shortestDistance[counter].AtStreet == null||shortestDistance[counter].OnStreet == null) {
-              t.nextStop = shortestDistance[counter].Name;
-              t.StopNo = shortestDistance[counter].StopNo.toString();
-            } else{
-              t.nextStop = shortestDistance[counter].AtStreet.trim() + " and \n" + shortestDistance[counter].OnStreet.trim().substring(shortestDistance[counter].OnStreet.indexOf(" ")+1);
-              t.StopNo = shortestDistance[counter].StopNo.toString();
-            }
-            count++;
+            t.StopNo = currentStop.StopNo.toString();
+            validSchedules.add(t);
           }
-          for(int i=remove.length-1;i>=0;i--){
-            routeObjects.Schedules.removeAt(remove[i]);
-          }
-          List<String> list = new List<String>();
-          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-            list.add(routeTrip.RouteNo);
-          }
-          print("---");
-          print(routeObjects.RouteNo);
-          for (var s in routeObjects.Schedules) {
-            print("   " + s.Destination);
-          }
-          print("---");
-          if (!list.contains(routeObjects.RouteNo)) {
-            routeTrips.add(new BothDirectionRouteWithTrips(
-                routeObjects.RouteNo, routeObjects.Schedules));
+
+          final String routeNo = routeObjects.RouteNo ?? '';
+          final int existingIndex =
+              routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+          if (existingIndex < 0) {
+            routeTrips.add(BothDirectionRouteWithTrips(routeNo, validSchedules));
           } else {
-            for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-              if (routeTrip.RouteNo == routeObjects.RouteNo) {
-                routeTrip.Trips.addAll(routeObjects.Schedules);
-                break;
-              }
-            }
+            routeTrips[existingIndex].Trips.addAll(validSchedules);
           }
         }
-      } else {
-        print("Could not get info for stop " + shortestDistance[counter].StopNo.toString());
       }
-      counter++;
     }
 
-    print(DateTime.now().toString() + " END OF BUS FETCHER");
     return routeTrips;
   }
 }

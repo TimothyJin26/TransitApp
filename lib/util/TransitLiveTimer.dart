@@ -1,51 +1,56 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
-import '../home.dart';
-
-class TransitLiveTimer extends StatefulWidget {
-  final bool isLoading;
-  final Duration timeDifference;
-  const TransitLiveTimer(this.isLoading, this.timeDifference);
-
-  @override
-  _TransitLiveTimer createState() => _TransitLiveTimer();
+Color getTimerColor(String hex) {
+  final String h = hex.toUpperCase().replaceAll('#', '');
+  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
 }
 
-class _TransitLiveTimer extends State<TransitLiveTimer> {
+class TransitLiveTimer extends StatelessWidget {
+  final bool isLoading;
+  final Duration timeDifference;
+
+  const TransitLiveTimer(this.isLoading, this.timeDifference, {super.key});
 
   @override
   Widget build(BuildContext context) {
-
-   return Container(
+    return Container(
       width: 65.0,
       height: 25.0,
-      decoration: new BoxDecoration(color: Colors.grey, shape: BoxShape.rectangle, borderRadius: BorderRadius.all(Radius.circular(8.0))),
+      decoration: BoxDecoration(
+        color: Colors.grey,
+        shape: BoxShape.rectangle,
+        borderRadius: BorderRadius.all(Radius.circular(8.0)),
+      ),
       child: Align(
-          alignment: Alignment.center,
-          child: RichText(
-              text: TextSpan(children: [
-                WidgetSpan(
-                    child: widget.isLoading
-                        ? SizedBox(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        backgroundColor: getColorFromHex("1bab65"),
-                      ),
-                      height: 15,
-                      width: 15,
-                    )
-                        : Icon(
-                      Icons.rss_feed,
-                      size: 16,
-                    )),
-                !widget.isLoading
-                    ? TextSpan(
-                    style: TextStyle(fontWeight: FontWeight.w400, fontStyle: FontStyle.normal, fontSize: 13),
-                    text: ((30 - widget.timeDifference.inSeconds).toString()) + " sec")
-                    : TextSpan(text: ""),
-              ]))),
+        alignment: Alignment.center,
+        child: RichText(
+          text: TextSpan(
+            children: [
+              WidgetSpan(
+                child: isLoading
+                    ? SizedBox(
+                        height: 15,
+                        width: 15,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          backgroundColor: getTimerColor('1bab65'),
+                        ),
+                      )
+                    : const Icon(Icons.rss_feed, size: 16),
+              ),
+              if (!isLoading)
+                TextSpan(
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w400,
+                    fontStyle: FontStyle.normal,
+                    fontSize: 13,
+                  ),
+                  text: '${30 - timeDifference.inSeconds} sec',
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -1,72 +1,58 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:http/http.dart' as http;
-import 'package:json_annotation/json_annotation.dart';
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
+import 'package:http/http.dart' as http;
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
+import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/models/Trip.dart';
 
 class BusAtSingleStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busAtSingleStopFetcher(
       Stop stop, String busStopNum) async {
-    List<BothDirectionRouteWithTrips> routeTrips =
-        new List<BothDirectionRouteWithTrips>();
+    final List<BothDirectionRouteWithTrips> routeTrips = [];
 
-    String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/' +
-        busStopNum +
-        '/estimates?apikey=perA9biw6Ipc8aobcMa3';
-    Map<String, String> requestHeaders = {
-      'Accept': 'application/json',
-    };
+    final String stopLocationsURL =
+        'https://api.translink.ca/rttiapi/v1/stops/$busStopNum/estimates?apikey=perA9biw6Ipc8aobcMa3';
+    final Map<String, String> requestHeaders = {'Accept': 'application/json'};
 
     try {
       final response = await http
-          .get(stopLocationsURL, headers: requestHeaders)
-          .timeout(Duration(seconds: 3));
+          .get(Uri.parse(stopLocationsURL), headers: requestHeaders)
+          .timeout(const Duration(seconds: 3));
 
-      if (response.statusCode == 200) {
-        List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
-//        List<RouteID> routeIDs = [];
+      if (response.statusCode != 200) return [];
 
-        for (int i = 0; i < listOfTripsJson.length; i++) {
-          SingleDirectionRouteWithTrips greatFamine =
-              SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
-          for (Trip t in greatFamine.Schedules) {
-            if (stop.AtStreet == null || stop.OnStreet == null) {
-              t.nextStop = stop.Name;
-              t.StopNo = stop.StopNo.toString();
-            } else {
-              t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
-              t.StopNo = stop.StopNo.toString();
-            }
-          }
+      final List<dynamic> listOfTripsJson =
+          json.decode(response.body) as List;
 
-          List<String> list = new List<String>();
-          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-            list.add(routeTrip.RouteNo);
-          }
-          if (!list.contains(greatFamine.RouteNo)) {
-            routeTrips.add(new BothDirectionRouteWithTrips(
-                greatFamine.RouteNo, greatFamine.Schedules));
+      for (final dynamic item in listOfTripsJson) {
+        final SingleDirectionRouteWithTrips route =
+            SingleDirectionRouteWithTrips.fromJson(
+                item as Map<String, dynamic>);
+
+        for (final Trip t in route.Schedules ?? []) {
+          if (stop.AtStreet == null || stop.OnStreet == null) {
+            t.nextStop = stop.Name;
           } else {
-            for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-              if (routeTrip.RouteNo == greatFamine.RouteNo) {
-                routeTrip.Trips.addAll(greatFamine.Schedules);
-              }
-            }
+            t.nextStop = '${stop.AtStreet} and \n${stop.OnStreet}';
           }
-//          routeIDs.add(greatFamine);
+          t.StopNo = stop.StopNo.toString();
         }
-      } else {
-        print("else");
-        return [];
+
+        final String routeNo = route.RouteNo ?? '';
+        final int existingIndex =
+            routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+        if (existingIndex < 0) {
+          routeTrips.add(
+              BothDirectionRouteWithTrips(routeNo, route.Schedules ?? []));
+        } else {
+          routeTrips[existingIndex].Trips.addAll(route.Schedules ?? []);
+        }
       }
-    } on TimeoutException catch (e) {
-      print("TimeoutException");
+    } on TimeoutException {
+      return [];
+    } catch (e) {
       return [];
     }
 
