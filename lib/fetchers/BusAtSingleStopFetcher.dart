@@ -1,59 +1,63 @@
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/models/Trip.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
+import 'package:transitapp/util/GtfsUtil.dart';
 
 class BusAtSingleStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busAtSingleStopFetcher(
       Stop stop, String busStopNum) async {
+    await GtfsStaticService().ensureLoaded();
+
+    final stopCode = int.tryParse(busStopNum);
+    if (stopCode == null) return [];
+    final stopId = GtfsStaticService().getStopId(stopCode);
+    if (stopId == null) return [];
+
+    final entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final static_ = GtfsStaticService();
     final List<BothDirectionRouteWithTrips> routeTrips = [];
 
-    final String stopLocationsURL =
-        'https://api.translink.ca/rttiapi/v1/stops/$busStopNum/estimates?apikey=perA9biw6Ipc8aobcMa3';
-    final Map<String, String> requestHeaders = {'Accept': 'application/json'};
+    for (final entry in entries) {
+      final tu = entry.tripUpdate;
+      final stu = entry.stopTimeUpdate;
 
-    try {
-      final response = await http
-          .get(Uri.parse(stopLocationsURL), headers: requestHeaders)
-          .timeout(const Duration(seconds: 3));
+      final departureTime = stu.time;
+      if (departureTime == null) continue;
+      final countdown = ((departureTime - nowSec) / 60).floor();
+      if (countdown < 0) continue;
 
-      if (response.statusCode != 200) return [];
-
-      final List<dynamic> listOfTripsJson =
-          json.decode(response.body) as List;
-
-      for (final dynamic item in listOfTripsJson) {
-        final SingleDirectionRouteWithTrips route =
-            SingleDirectionRouteWithTrips.fromJson(
-                item as Map<String, dynamic>);
-
-        for (final Trip t in route.Schedules ?? []) {
-          if (stop.AtStreet == null || stop.OnStreet == null) {
-            t.nextStop = stop.Name;
-          } else {
-            t.nextStop = '${stop.AtStreet} and \n${stop.OnStreet}';
-          }
-          t.StopNo = stop.StopNo.toString();
-        }
-
-        final String routeNo = route.RouteNo ?? '';
-        final int existingIndex =
-            routeTrips.indexWhere((r) => r.RouteNo == routeNo);
-        if (existingIndex < 0) {
-          routeTrips.add(
-              BothDirectionRouteWithTrips(routeNo, route.Schedules ?? []));
-        } else {
-          routeTrips[existingIndex].Trips.addAll(route.Schedules ?? []);
-        }
+      final tripInfo = static_.getTripInfo(tu.tripId);
+      final routeId =
+          tu.routeId.isNotEmpty ? tu.routeId : (tripInfo?.routeId ?? '');
+      String routeNo = static_.getRouteShortName(routeId) ?? routeId;
+      while (routeNo.startsWith('0')) {
+        routeNo = routeNo.substring(1);
       }
-    } on TimeoutException {
-      return [];
-    } catch (e) {
-      return [];
+
+      final trip = Trip(
+        Pattern: tu.directionId == 0 ? 'Outbound' : 'Inbound',
+        Destination: (tripInfo?.headsign ?? '').toUpperCase(),
+        ExpectedCountdown: countdown,
+        LastUpdate: DateTime.now().toIso8601String(),
+        RouteNo: routeNo,
+        ExpectedLeaveTime: GtfsUtil.formatTime(departureTime),
+      );
+      trip.nextStop = GtfsUtil.nextStopLabel(
+        name: stop.Name,
+        onStreet: stop.OnStreet,
+        atStreet: stop.AtStreet,
+      );
+      trip.StopNo = stop.StopNo.toString();
+
+      final idx = routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+      if (idx < 0) {
+        routeTrips.add(BothDirectionRouteWithTrips(routeNo, [trip]));
+      } else {
+        routeTrips[idx].Trips.add(trip);
+      }
     }
 
     return routeTrips;

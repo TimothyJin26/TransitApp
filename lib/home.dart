@@ -653,7 +653,9 @@ class _TransitAppState extends State<TransitApp> {
     if (s.startsWith('N')) return 'NORTHBOUND';
     if (s.startsWith('W')) return 'WESTBOUND';
     if (s.startsWith('S')) return 'SOUTHBOUND';
-    return s;
+    if (s.toLowerCase() == 'outbound') return 'OUTBOUND';
+    if (s.toLowerCase() == 'inbound') return 'INBOUND';
+    return s.toUpperCase();
   }
 
   String removeZeroes(String s) {

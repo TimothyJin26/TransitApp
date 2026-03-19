@@ -1,42 +1,53 @@
-import 'dart:async';
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Trip.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
+import 'package:transitapp/util/GtfsUtil.dart';
 
 class NextBusesForRouteAtStop {
   Future<List<Trip>> busAtSingleStopFetcher(
       String stopNo, String routeNo) async {
-    final String url =
-        'https://api.translink.ca/rttiapi/v1/stops/$stopNo/estimates'
-        '?apikey=perA9biw6Ipc8aobcMa3&count=10&timeframe=600&routeNo=$routeNo';
-    final Map<String, String> requestHeaders = {'Accept': 'application/json'};
+    await GtfsStaticService().ensureLoaded();
 
-    try {
-      final response =
-          await http.get(Uri.parse(url), headers: requestHeaders);
+    final stopCode = int.tryParse(stopNo);
+    if (stopCode == null) return [];
+    final stopId = GtfsStaticService().getStopId(stopCode);
+    if (stopId == null) return [];
 
-      if (response.statusCode != 200) return [];
+    final entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final static_ = GtfsStaticService();
+    final List<Trip> trips = [];
 
-      final List<dynamic> listOfTripsJson =
-          json.decode(response.body) as List;
+    for (final entry in entries) {
+      final tu = entry.tripUpdate;
+      final stu = entry.stopTimeUpdate;
 
-      List<Trip> routeTrips = [];
-      for (final dynamic item in listOfTripsJson) {
-        final SingleDirectionRouteWithTrips route =
-            SingleDirectionRouteWithTrips.fromJson(
-                item as Map<String, dynamic>);
-        routeTrips = route.Schedules ?? [];
+      final tripInfo = static_.getTripInfo(tu.tripId);
+      final routeId =
+          tu.routeId.isNotEmpty ? tu.routeId : (tripInfo?.routeId ?? '');
+      String thisRouteNo = static_.getRouteShortName(routeId) ?? routeId;
+      while (thisRouteNo.startsWith('0')) {
+        thisRouteNo = thisRouteNo.substring(1);
       }
+      if (thisRouteNo != routeNo) continue;
 
-      routeTrips.sort((a, b) =>
-          (a.ExpectedCountdown ?? 0).compareTo(b.ExpectedCountdown ?? 0));
-      return routeTrips;
-    } on TimeoutException {
-      return [];
-    } catch (e) {
-      return [];
+      final departureTime = stu.time;
+      if (departureTime == null) continue;
+      final countdown = ((departureTime - nowSec) / 60).floor();
+      if (countdown < 0) continue;
+
+      trips.add(Trip(
+        Pattern: tu.directionId == 0 ? 'Outbound' : 'Inbound',
+        Destination: (tripInfo?.headsign ?? '').toUpperCase(),
+        ExpectedCountdown: countdown,
+        LastUpdate: DateTime.now().toIso8601String(),
+        RouteNo: thisRouteNo,
+        ExpectedLeaveTime: GtfsUtil.formatTime(departureTime),
+      ));
     }
+
+    trips.sort(
+        (a, b) => (a.ExpectedCountdown ?? 0).compareTo(b.ExpectedCountdown ?? 0));
+    return trips.take(10).toList();
   }
 }
