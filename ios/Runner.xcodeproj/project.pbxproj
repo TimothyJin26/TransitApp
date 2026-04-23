@@ -186,9 +186,7 @@
 				TargetAttributes = {
 					97C146ED1CF9000F007C117D = {
 						CreatedOnToolsVersion = 7.3.1;
-						DevelopmentTeam = 9R3558UF26;
 						LastSwiftMigration = 1200;
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -424,7 +422,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 14;
-				DEVELOPMENT_TEAM = 9R3558UF26;
+				DEVELOPMENT_TEAM = D5WTPTV92V;
 				ENABLE_BITCODE = NO;
 				EXCLUDED_ARCHS = armv7;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -443,7 +441,7 @@
 				);
 				MARKETING_VERSION = 1.0.12;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.transit;
+				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.app;
 				PRODUCT_NAME = Transit;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -564,7 +562,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 14;
-				DEVELOPMENT_TEAM = 9R3558UF26;
+				DEVELOPMENT_TEAM = D5WTPTV92V;
 				ENABLE_BITCODE = NO;
 				EXCLUDED_ARCHS = armv7;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -583,7 +581,7 @@
 				);
 				MARKETING_VERSION = 1.0.12;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.transit;
+				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.app;
 				PRODUCT_NAME = Transit;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -604,7 +602,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 14;
-				DEVELOPMENT_TEAM = 9R3558UF26;
+				DEVELOPMENT_TEAM = D5WTPTV92V;
 				ENABLE_BITCODE = NO;
 				EXCLUDED_ARCHS = armv7;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -623,7 +621,7 @@
 				);
 				MARKETING_VERSION = 1.0.12;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.transit;
+				PRODUCT_BUNDLE_IDENTIFIER = com.transitappvancouver.app;
 				PRODUCT_NAME = Transit;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
