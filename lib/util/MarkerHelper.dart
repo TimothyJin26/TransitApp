@@ -23,14 +23,12 @@ class MarkerHelper {
 
   /// Creates a marker for each bus with the route number drawn on top.
   static Future<BitmapDescriptor> createCustomMarkerBitmap(
-      String title, int index, ui.Image image) async {
-    const int width = 75;
-    const int height = 75;
-
+      String title, int index, ui.Image image,
+      {int width = 48, int height = 48}) async {
     final TextSpan span = TextSpan(
-      style: const TextStyle(
+      style: TextStyle(
         color: Colors.black87,
-        fontSize: 26.0,
+        fontSize: height * 0.35,
         fontWeight: FontWeight.bold,
       ),
       text: title,
@@ -50,7 +48,7 @@ class MarkerHelper {
     paintImage(canvas: c, image: image, rect: oval, fit: BoxFit.fitWidth);
 
     tp.layout();
-    tp.paint(c, Offset((width - tp.width) / 2, 16));
+    tp.paint(c, Offset((width - tp.width) / 2, height * 0.22));
 
     final ui.Picture p = recorder.endRecording();
     final ByteData? pngBytes =

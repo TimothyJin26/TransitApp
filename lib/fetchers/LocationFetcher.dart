@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/models/RouteLink.dart';
 import 'package:transitapp/services/GtfsRealtimeService.dart';
@@ -10,6 +11,10 @@ class LocationFetcher {
 
     final vehicles = await GtfsRealtimeService().getVehiclePositions();
     final static_ = GtfsStaticService();
+    final bool routesLoaded = static_.hasRoutesLoaded;
+    if (!routesLoaded) {
+      debugPrint('LocationFetcher: GTFS static routes not loaded — bus markers will show raw route_id');
+    }
     final List<Bus> buses = [];
 
     for (final v in vehicles) {
@@ -17,6 +22,12 @@ class LocationFetcher {
       final routeId =
           v.routeId.isNotEmpty ? v.routeId : (tripInfo?.routeId ?? '');
       String routeNo = static_.getRouteShortName(routeId) ?? routeId;
+      if (!routesLoaded && buses.isEmpty && routeId.isNotEmpty) {
+        debugPrint('LocationFetcher: sample routeId="$routeId" tripId="${v.tripId}" vehicleId="${v.vehicleId}"');
+      }
+      if (routesLoaded && static_.getRouteShortName(routeId) == null && routeId.isNotEmpty) {
+        debugPrint('LocationFetcher: no route name for routeId="$routeId" tripId="${v.tripId}"');
+      }
       while (routeNo.startsWith('0')) {
         routeNo = routeNo.substring(1);
       }

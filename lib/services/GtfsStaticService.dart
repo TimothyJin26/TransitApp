@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:archive/archive.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:transitapp/models/Stop.dart';
 
-const _apiKey = 'perA9biw6Ipc8aobcMa3';
 
 class _GtfsTrip {
   final String routeId;
@@ -37,8 +37,11 @@ class GtfsStaticService {
 
   bool _stopsLoaded = false;
   bool _staticLoaded = false;
+  DateTime? _lastStaticAttempt;
 
   // ── Public API ─────────────────────────────────────────────────────────────
+
+  bool get hasRoutesLoaded => _routes.isNotEmpty;
 
   /// Must be awaited before calling any other method.
   Future<void> ensureLoaded() async {
@@ -47,8 +50,14 @@ class GtfsStaticService {
       _stopsLoaded = true;
     }
     if (!_staticLoaded) {
-      await _downloadStaticZip();
-      _staticLoaded = true;
+      // Retry at most once every 5 minutes to avoid hammering the API.
+      final now = DateTime.now();
+      if (_lastStaticAttempt == null ||
+          now.difference(_lastStaticAttempt!).inMinutes >= 5) {
+        _lastStaticAttempt = now;
+        await _downloadStaticZip();
+        if (_routes.isNotEmpty) _staticLoaded = true;
+      }
     }
   }
 
@@ -130,12 +139,17 @@ class GtfsStaticService {
 
   Future<void> _downloadStaticZip() async {
     try {
+      debugPrint('GtfsStaticService: downloading static ZIP...');
       final resp = await http
           .get(Uri.parse(
-              'https://gtfsapi.translink.ca/v3/gtfs?apikey=$_apiKey'))
-          .timeout(const Duration(seconds: 30));
-      if (resp.statusCode != 200) return;
+              'https://gtfs-static.translink.ca/gtfs/google_transit.zip'))
+          .timeout(const Duration(seconds: 60));
+      if (resp.statusCode != 200) {
+        debugPrint('GtfsStaticService: HTTP ${resp.statusCode} — ${resp.reasonPhrase}');
+        return;
+      }
 
+      debugPrint('GtfsStaticService: downloaded ${resp.bodyBytes.length} bytes, decoding...');
       final archive = ZipDecoder().decodeBytes(resp.bodyBytes);
       for (final file in archive) {
         if (!file.isFile) continue;
@@ -144,8 +158,9 @@ class GtfsStaticService {
         if (name == 'routes.txt') _parseRoutes(content);
         if (name == 'trips.txt') _parseTrips(content);
       }
-    } catch (_) {
-      // Gracefully degrade — route names will fall back to route_id.
+      debugPrint('GtfsStaticService: loaded ${_routes.length} routes, ${_trips.length} trips');
+    } catch (e) {
+      debugPrint('GtfsStaticService: static ZIP download failed: $e');
     }
   }
 

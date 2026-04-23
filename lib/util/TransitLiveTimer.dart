@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-
-Color getTimerColor(String hex) {
-  final String h = hex.toUpperCase().replaceAll('#', '');
-  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-}
+import 'package:transitapp/util/TransitUtil.dart';
 
 class TransitLiveTimer extends StatelessWidget {
   final bool isLoading;
@@ -33,7 +29,7 @@ class TransitLiveTimer extends StatelessWidget {
                         width: 15,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          backgroundColor: getTimerColor('1bab65'),
+                          backgroundColor: colorFromHex('1bab65'),
                         ),
                       )
                     : const Icon(Icons.rss_feed, size: 16),

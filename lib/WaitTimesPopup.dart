@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:transitapp/util/TransitUtil.dart';
 
 import 'fetchers/NextBusesForRouteAtStop.dart';
 import 'models/Trip.dart';
-
-Color _colorFromHex(String hexColor) {
-  final String h = hexColor.toUpperCase().replaceAll('#', '');
-  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-}
 
 class WaitTimesPopup extends StatefulWidget {
   final String routeNo;
@@ -27,15 +23,6 @@ class WaitTimesPopup extends StatefulWidget {
 class _WaitTimesPopupState extends State<WaitTimesPopup> {
   List<Trip> trips = [];
 
-  String _timeFormatter(String input) {
-    final String time = input.split(' ')[0];
-    if (time.contains('am')) {
-      return '${time.substring(0, time.length - 2)} AM';
-    } else {
-      return '${time.substring(0, time.length - 2)} PM';
-    }
-  }
-
   @override
   void initState() {
     super.initState();
@@ -55,7 +42,7 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.only(top: 36.0),
-        color: _colorFromHex('#024D7E'),
+        color: colorFromHex('#024D7E'),
         child: Column(
           children: [
             Row(
@@ -99,7 +86,7 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
                 margin: const EdgeInsets.all(12.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: _colorFromHex('#EEEEEE'),
+                    color: colorFromHex('#EEEEEE'),
                     borderRadius: BorderRadius.circular(24.0),
                   ),
                   child: Scrollbar(
@@ -118,10 +105,9 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
                                 child: RichText(
                                   textAlign: TextAlign.left,
                                   text: TextSpan(
-                                    text: _timeFormatter(
-                                        trip.ExpectedLeaveTime ?? ''),
+                                    text: trip.ExpectedLeaveTime ?? '',
                                     style: TextStyle(
-                                      color: _colorFromHex('#0d2036'),
+                                      color: colorFromHex('#0d2036'),
                                       fontWeight: FontWeight.w600,
                                       fontSize: 20,
                                     ),
@@ -134,7 +120,7 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
                                 text: TextSpan(
                                   text: 'TO ${trip.Destination ?? ''}',
                                   style: TextStyle(
-                                    color: _colorFromHex('#0d2036'),
+                                    color: colorFromHex('#0d2036'),
                                     fontWeight: FontWeight.w500,
                                     fontSize: 18,
                                   ),
