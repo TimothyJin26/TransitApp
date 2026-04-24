@@ -18,7 +18,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
-import 'package:transitapp/searchbar/searchBar.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:transitapp/util/SunsetHelper.dart';
@@ -28,6 +27,7 @@ import 'package:vibration/vibration.dart';
 import 'package:app_settings/app_settings.dart';
 
 import 'WaitTimesPopup.dart';
+import 'stop_search_bar.dart';
 import 'fetchers/BusAtStopFetcher.dart';
 import 'fetchers/RouteMapCoordinateHelper.dart';
 import 'fetchers/StopFetcher.dart';
@@ -66,7 +66,6 @@ class _TransitAppState extends State<TransitApp> {
   DateTime? timeLastUpdatedForInit;
   var isLoading = true;
   var zoomBool = false;
-  var isSearching = false;
   var highlightedStopNo;
   var listOfStops = <Stop>[];
   var count = 0;
@@ -94,7 +93,7 @@ class _TransitAppState extends State<TransitApp> {
   GoogleMapController? mapController;
   bool isLocationOnMapEnabled = false;
   String? _currentMapStyle;
-  final SearchBarController<Stop> searchBarController = SearchBarController();
+  final StopSearchBarController _searchBarController = StopSearchBarController();
 
   void vibrate() async {
     if (await Vibration.hasCustomVibrationsSupport()) {
@@ -442,9 +441,6 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   Future<List<Stop>> search(String searchText) async {
-    setState(() {
-      isSearching = true;
-    });
     final List<Stop> toRet = [];
     for (final Stop s in listOfStops) {
       if ((s.Name?.toLowerCase().contains(searchText.toLowerCase()) ?? false) ||
@@ -754,7 +750,7 @@ class _TransitAppState extends State<TransitApp> {
                       selectedStop == null ? [] : [selectedStop])),
               onTap: (LatLng a) {
                 tappedIntoStop = false;
-                searchBarController.clear();
+                _searchBarController.clear();
                 setState(() {
                   if (nextBusesCopy != null &&
                       scrollSheetDotListCopy != null) {
@@ -805,7 +801,7 @@ class _TransitAppState extends State<TransitApp> {
             Visibility(
               visible: !showingSpecificBuses,
               child: Positioned(
-                top: 105,
+                top: 116,
                 right: 7,
                 left: 7,
                 child: Align(
@@ -858,7 +854,7 @@ class _TransitAppState extends State<TransitApp> {
             Visibility(
               visible: !showingSpecificBuses,
               child: Positioned(
-                top: 162,
+                top: 170,
                 right: 7,
                 left: 7,
                 child: Align(
@@ -868,7 +864,8 @@ class _TransitAppState extends State<TransitApp> {
                     width: 50,
                     child: FittedBox(
                       child: FloatingActionButton(
-                        heroTag: 'subway',
+                        heroTag: 'centerLocation',
+                        shape: const CircleBorder(),
                         onPressed: _currentLocation,
                         backgroundColor:
                             const Color.fromRGBO(255, 255, 255, 1),
@@ -877,29 +874,6 @@ class _TransitAppState extends State<TransitApp> {
                           size: 24,
                           color: Color.fromRGBO(0, 0, 0, 1),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 105,
-              left: 10,
-              child: Align(
-                alignment: Alignment.bottomRight,
-                child: SizedBox(
-                  height: 50,
-                  width: 50,
-                  child: FittedBox(
-                    child: FloatingActionButton(
-                      heroTag: 'vanaqua',
-                      onPressed: showAquariumPopup,
-                      backgroundColor:
-                          const Color.fromRGBO(255, 255, 255, 1),
-                      child: IconButton(
-                        icon: Image.asset('images/Aquarium Marker.png'),
-                        onPressed: showAquariumPopup,
                       ),
                     ),
                   ),
@@ -1271,62 +1245,23 @@ class _TransitAppState extends State<TransitApp> {
                 },
               ),
             ),
-            Positioned(
-              top: 0,
-              right: 0,
-              bottom: 0,
-              left: 0,
-              child: AnimatedOpacity(
-                opacity: isSearching ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Visibility(
-                  visible: isSearching,
-                  child: Container(
-                    decoration: const BoxDecoration(color: Colors.white),
-                  ),
-                ),
-              ),
-            ),
             Visibility(
               visible: !showingSpecificBuses,
-              child: TransitSearchBar<Stop>(
-                searchBarController: searchBarController,
-                minimumChars: 1,
+              child: StopSearchBar(
+                controller: _searchBarController,
                 hintText: 'Search for stops',
-                textStyle: const TextStyle(fontSize: 18),
-                shrinkWrap: true,
-                placeHolder: const SizedBox.shrink(),
-                contentPadding: EdgeInsets.zero,
-                searchBarPadding:
-                    const EdgeInsets.fromLTRB(10, 20, 10, 0),
-                searchBarStyle: SearchBarStyle(
-                  searchBarHeight: 52,
-                  backgroundColor: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                padding: const EdgeInsets.fromLTRB(10, 60, 10, 0),
                 onSearch: search,
                 onCancelled: () {
-                  highlightedStopNo = null;
-                  FocusScope.of(context).requestFocus(FocusNode());
                   setState(() {
-                    isSearching = false;
+                    highlightedStopNo = null;
                   });
                 },
-                onError: (error) {
-                  return const Text('no error');
-                },
-                emptyWidget: Align(
-                  alignment: Alignment.center,
-                  child: RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontStyle: FontStyle.normal,
-                        fontSize: 18,
-                      ),
-                      text: 'No Stops Found',
-                    ),
+                emptyWidget: const Text(
+                  'No Stops Found',
+                  style: TextStyle(
+                    color: Colors.black87,
+                    fontSize: 18,
                   ),
                 ),
                 onItemFound: (Stop post, int index) {
@@ -1352,7 +1287,7 @@ class _TransitAppState extends State<TransitApp> {
                           renderListOfNextBuses(value);
                         });
                       });
-                      searchBarController.clear();
+                      _searchBarController.clear();
                       final CameraPosition kLake = CameraPosition(
                           target: LatLng(
                               post.Latitude ?? 0, post.Longitude ?? 0),
@@ -1392,11 +1327,11 @@ class _TransitAppState extends State<TransitApp> {
                           });
                         },
                         backgroundColor:
-                            const Color.fromRGBO(255, 255, 255, 0.25),
+                            const ui.Color.fromARGB(64, 165, 8, 8),
                         child: const Icon(
                           Icons.arrow_back_ios,
                           size: 25,
-                          color: Color.fromRGBO(255, 255, 255, 0.85),
+                          color: ui.Color.fromRGBO(174, 19, 19, 0.851),
                         ),
                       ),
                     ),
@@ -1527,3 +1462,4 @@ Color getColorFromHex(String hexColor) {
   final String h = hexColor.toUpperCase().replaceAll('#', '');
   return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
 }
+
