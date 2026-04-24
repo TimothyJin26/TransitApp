@@ -8,9 +8,7 @@ import 'dart:collection';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:carousel_slider_plus/carousel_slider_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:geolocator/geolocator.dart';
@@ -21,13 +19,12 @@ import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:transitapp/util/SunsetHelper.dart';
-import 'package:transitapp/util/TransitLiveTimer.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:vibration/vibration.dart';
-import 'package:app_settings/app_settings.dart';
 
 import 'WaitTimesPopup.dart';
+import 'bus_sheet.dart';
 import 'stop_search_bar.dart';
+import 'transit_util.dart';
 import 'fetchers/BusAtStopFetcher.dart';
 import 'fetchers/RouteMapCoordinateHelper.dart';
 import 'fetchers/StopFetcher.dart';
@@ -76,8 +73,6 @@ class _TransitAppState extends State<TransitApp> {
   Position? userLocation;
   List<BothDirectionRouteWithTrips>? nextBusesCopy;
   List? scrollSheetDotListCopy;
-  var shouldShowTranslinkOutage = false;
-
   var selectedRouteNo;
   var selectedPattern;
   Marker? selectedStop;
@@ -108,103 +103,7 @@ class _TransitAppState extends State<TransitApp> {
     return Geolocator.getCurrentPosition();
   }
 
-  void showAquariumPopup() {
-    final BuildContext? ctx = _scaffoldKey.currentContext;
-    if (ctx == null) return;
-    showModalBottomSheet(
-      context: ctx,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) => SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 12),
-            Center(
-              child: SizedBox(
-                width: 180,
-                height: 180,
-                child: Image.asset('images/fishcopy.png'),
-              ),
-            ),
-            Container(
-              alignment: Alignment.center,
-              margin: const EdgeInsets.fromLTRB(10, 15, 5, 15),
-              child: const Text(
-                'Due to the COVID-19 Pandemic, the Vancouver Aquarium paused all public programming. '
-                'During this time, essential donations would be put towards the critical care of over 70000 animals. '
-                '100% of ad revenue from this app goes towards the Vancouver Aquarium',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  height: 1.3,
-                  fontWeight: FontWeight.w300,
-                  fontSize: 20,
-                  color: Colors.black87,
-                ),
-              ),
-            ),
-            Center(
-              child: Wrap(
-                spacing: 8,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: getColorFromHex('256BD1'),
-                      minimumSize: const Size(150, 55),
-                    ),
-                    child: const Text(
-                      'Learn More',
-                      style: TextStyle(color: Colors.white, fontSize: 17),
-                    ),
-                    onPressed: () => launchUrl(
-                      Uri.parse('https://www.vanaqua.org/transformation'),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: getColorFromHex('256BD1'),
-                      minimumSize: const Size(150, 55),
-                    ),
-                    child: const Text(
-                      'Donate',
-                      style: TextStyle(color: Colors.white, fontSize: 17),
-                    ),
-                    onPressed: () => launchUrl(
-                      Uri.parse(
-                          'https://www.vanaqua.org/support/ways-to-support'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void createAquariumMarker() async {
-    final ui.Image image = await load('images/Aquarium Marker.png');
-    final BitmapDescriptor imagea =
-        await MarkerHelper.createCustomMarkerBitmapNoText(image, 150, 100);
-    final Marker aquariumMarker = Marker(
-      onTap: showAquariumPopup,
-      markerId: const MarkerId('aquarium'),
-      position: const LatLng(49.3002649, -123.1311801),
-      icon: imagea,
-    );
-    _markers['aquarium'] = aquariumMarker;
-  }
-
-  void clearAndAddAquarium() {
-    _markers.removeWhere((key, value) => key != 'aquarium');
-  }
-
   void initWithLocation() {
-    createAquariumMarker();
     final now = DateTime.now();
     if (timeLastUpdatedForInit == null ||
         now.difference(timeLastUpdatedForInit!).inSeconds > 5) {
@@ -218,19 +117,8 @@ class _TransitAppState extends State<TransitApp> {
           isLocationEnabled = true;
         });
 
-        if (isSelected[0] == false) {
-          LocationFetcher().fetchAllBuses().then((value) {
-            if (value.isEmpty) {
-              setState(() {
-                shouldShowTranslinkOutage = true;
-              });
-            }
-          });
-          updateNextBusesForAllNearbyStops();
-        } else {
-          updateBuses();
-          updateNextBusesForAllNearbyStops();
-        }
+        if (isSelected[0]) updateBuses();
+        updateNextBusesForAllNearbyStops();
         hasLoaded = true;
       }).catchError((Object onError) {
         hasLoaded = true;
@@ -465,8 +353,8 @@ class _TransitAppState extends State<TransitApp> {
       for (final Stop stop in stops)
         MarkerHelper.createCustomMarkerBitmapNoText(
           image,
-          highlightedStopNo == stop.StopNo ? 110 : 75,
-          highlightedStopNo == stop.StopNo ? 110 : 75,
+          highlightedStopNo == stop.StopNo ? 80 : 50,
+          highlightedStopNo == stop.StopNo ? 80 : 50,
         ),
     ];
 
@@ -582,7 +470,7 @@ class _TransitAppState extends State<TransitApp> {
     final List<Marker> list = await getBusList(buses);
     setState(() {
       isLoading = false;
-      clearAndAddAquarium();
+      _markers.clear();
       for (final Marker m in list) {
         _markers[m.markerId.toString()] = m;
       }
@@ -617,7 +505,7 @@ class _TransitAppState extends State<TransitApp> {
         await StopFetcher().stopFetcher(latitude, longitude);
     final List<Marker> list = await getStopList(stops);
     setState(() {
-      clearAndAddAquarium();
+      _markers.clear();
       for (final Marker m in list) {
         _markers[m.markerId.toString()] = m;
       }
@@ -626,7 +514,7 @@ class _TransitAppState extends State<TransitApp> {
 
   void updateStopsForMap(double latitude1, double latitude2,
       double longitude1, double longitude2) async {
-    clearAndAddAquarium();
+    _markers.clear();
     final List<Stop> validStops = [
       for (final Stop s in listOfStops)
         if ((s.Latitude ?? 0) < latitude1 &&
@@ -637,28 +525,11 @@ class _TransitAppState extends State<TransitApp> {
     ];
     final List<Marker> list = await getStopList(validStops);
     setState(() {
-      clearAndAddAquarium();
+      _markers.clear();
       for (final Marker m in list) {
         _markers[m.markerId.toString()] = m;
       }
     });
-  }
-
-  String patternHelper(String s) {
-    if (s.startsWith('E')) return 'EASTBOUND';
-    if (s.startsWith('N')) return 'NORTHBOUND';
-    if (s.startsWith('W')) return 'WESTBOUND';
-    if (s.startsWith('S')) return 'SOUTHBOUND';
-    if (s.toLowerCase() == 'outbound') return 'OUTBOUND';
-    if (s.toLowerCase() == 'inbound') return 'INBOUND';
-    return s.toUpperCase();
-  }
-
-  String removeZeroes(String s) {
-    while (s.isNotEmpty && s.substring(0, 1) == '0') {
-      s = s.substring(1);
-    }
-    return s;
   }
 
   Future<ui.Image> load(String asset) async {
@@ -882,366 +753,24 @@ class _TransitAppState extends State<TransitApp> {
             ),
             Visibility(
               visible: !showingSpecificBuses,
-              child: DraggableScrollableSheet(
-                initialChildSize: 0.4,
-                minChildSize: 0.2,
-                maxChildSize: 0.8,
-                builder:
-                    (BuildContext context, myscrollController) {
-                  return Container(
-                    color: Colors.deepOrangeAccent.withAlpha(0),
-                    child: Stack(children: [
-                      Container(
-                        margin: const EdgeInsets.fromLTRB(
-                            0.0, 27.0, 0.0, 0.0),
-                        color: darkModeOn
-                            ? getColorFromHex('1b2336')
-                                .withAlpha(252)
-                            : Colors.white.withAlpha(252),
-                        child: Stack(children: [
-                          AnimatedOpacity(
-                            opacity:
-                                nextBuses.isNotEmpty ? 1.0 : 0.0,
-                            duration:
-                                const Duration(milliseconds: 2),
-                            child: ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(
-                                  0, 15, 0, 0),
-                              controller: myscrollController,
-                              itemCount: nextBuses.length,
-                              itemBuilder:
-                                  (BuildContext context, int index) {
-                                return ListTile(
-                                  key: Key(nextBuses[index]
-                                      .RouteNo
-                                      .toString()),
-                                  title: Column(children: [
-                                    CarouselSlider(
-                                      options: CarouselOptions(
-                                        onPageChanged:
-                                            (carouselIndex,
-                                                reason) {
-                                          setState(() {
-                                            scrollSheetDotList[
-                                                    index] =
-                                                carouselIndex;
-                                          });
-                                        },
-                                        height: 64.0,
-                                        viewportFraction: 1.0,
-                                      ),
-                                      items: nextBuses[index]
-                                          .Trips
-                                          .map((trip) {
-                                        return Builder(
-                                          builder:
-                                              (BuildContext context) {
-                                            return InkWell(
-                                              onTap: () {
-                                                openWaitTimesPopup(
-                                                  nextBuses[index]
-                                                      .RouteNo,
-                                                  trip.Pattern ?? '',
-                                                  trip.StopNo ?? '',
-                                                );
-                                              },
-                                              child: Column(
-                                                children: <Widget>[
-                                                  Row(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .spaceBetween,
-                                                    children: <
-                                                        Widget>[
-                                                      Container(
-                                                        width: 70,
-                                                        margin: const EdgeInsets
-                                                            .only(
-                                                            right: 0,
-                                                            left: 0),
-                                                        child: Text(
-                                                          removeZeroes(
-                                                              nextBuses[
-                                                                      index]
-                                                                  .RouteNo),
-                                                          textAlign:
-                                                              TextAlign
-                                                                  .center,
-                                                          overflow:
-                                                              TextOverflow
-                                                                  .ellipsis,
-                                                          style: TextStyle(
-                                                            fontSize: removeZeroes(nextBuses[index].RouteNo).length < 3
-                                                                ? 50
-                                                                : 35,
-                                                            height: 1.0,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w700,
-                                                            color: darkModeOn
-                                                                ? Colors
-                                                                    .white70
-                                                                : getColorFromHex(
-                                                                    '#10295D'),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      Expanded(
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          children: <
-                                                              Widget>[
-                                                            Container(
-                                                              margin: const EdgeInsets
-                                                                  .only(
-                                                                  left:
-                                                                      15),
-                                                              child:
-                                                                  Text(
-                                                                nextBuses[index]
-                                                                        .Trips[scrollSheetDotList[index]]
-                                                                        .Destination ??
-                                                                    '',
-                                                                textAlign:
-                                                                    TextAlign
-                                                                        .left,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style: TextStyle(
-                                                                  fontSize:
-                                                                      18,
-                                                                  fontWeight:
-                                                                      FontWeight.w700,
-                                                                  height:
-                                                                      1.0,
-                                                                  color: darkModeOn
-                                                                      ? Colors.white70
-                                                                      : getColorFromHex('#024D7E'),
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            Container(
-                                                              margin: const EdgeInsets
-                                                                  .only(
-                                                                  left:
-                                                                      15),
-                                                              child:
-                                                                  Text(
-                                                                '${patternHelper(nextBuses[index].Trips[scrollSheetDotList[index]].Pattern ?? '')} at \n${nextBuses[index].Trips[scrollSheetDotList[index]].nextStop ?? ''}',
-                                                                textAlign:
-                                                                    TextAlign
-                                                                        .left,
-                                                                overflow:
-                                                                    TextOverflow
-                                                                        .ellipsis,
-                                                                style: TextStyle(
-                                                                    fontSize:
-                                                                        15,
-                                                                    height:
-                                                                        1.0,
-                                                                    fontWeight:
-                                                                        FontWeight.w400,
-                                                                    color: getColorFromHex('1bab65')),
-                                                              ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                      SizedBox(
-                                                        width: 83,
-                                                        child: Text(
-                                                          '${nextBuses[index].Trips[scrollSheetDotList[index]].ExpectedCountdown ?? 0} min',
-                                                          textAlign:
-                                                              TextAlign
-                                                                  .center,
-                                                          overflow:
-                                                              TextOverflow
-                                                                  .ellipsis,
-                                                          style: TextStyle(
-                                                            fontSize: (nextBuses[index].Trips[scrollSheetDotList[index]].ExpectedCountdown?.toString().length ?? 1) < 3
-                                                                ? 24
-                                                                : 20,
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .w700,
-                                                            height:
-                                                                1.0,
-                                                            color: darkModeOn
-                                                                ? Colors
-                                                                    .white70
-                                                                : getColorFromHex(
-                                                                    '#10295D'),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: nextBuses[index]
-                                          .Trips
-                                          .asMap()
-                                          .entries
-                                          .map((entry) {
-                                        return Container(
-                                          width: 6.0,
-                                          height: 5.0,
-                                          margin: const EdgeInsets
-                                              .symmetric(
-                                              vertical: 2.0,
-                                              horizontal: 2.0),
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: scrollSheetDotList[
-                                                        index] ==
-                                                    entry.key
-                                                ? (darkModeOn
-                                                    ? const Color
-                                                        .fromRGBO(
-                                                        255,
-                                                        255,
-                                                        255,
-                                                        0.3)
-                                                    : const Color
-                                                        .fromRGBO(0,
-                                                        0, 0, 0.3))
-                                                : (darkModeOn
-                                                    ? const Color
-                                                        .fromRGBO(
-                                                        255,
-                                                        255,
-                                                        255,
-                                                        0.15)
-                                                    : const Color
-                                                        .fromRGBO(0,
-                                                        0, 0, 0.15)),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                    Divider(
-                                      color: Theme.of(context)
-                                          .primaryColor,
-                                    ),
-                                  ]),
-                                );
-                              },
-                            ),
-                          ),
-                          Center(
-                            child: Column(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.center,
-                              children: [
-                                AnimatedOpacity(
-                                  opacity: nextBuses.isEmpty
-                                      ? 1.0
-                                      : 0.0,
-                                  duration: const Duration(
-                                      milliseconds: 20),
-                                  child: Align(
-                                    alignment: Alignment.center,
-                                    child: RichText(
-                                      text: TextSpan(
-                                        style: const TextStyle(
-                                          color: Colors.black,
-                                          fontWeight:
-                                              FontWeight.w500,
-                                          fontStyle:
-                                              FontStyle.normal,
-                                          fontSize: 19,
-                                        ),
-                                        text: scrollsheetText,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Visibility(
-                                  visible: !isLocationEnabled,
-                                  child: Flexible(
-                                    child: Container(
-                                      padding:
-                                          const EdgeInsets.fromLTRB(
-                                              35, 10, 30, 0),
-                                      child: RichText(
-                                        text: TextSpan(
-                                          recognizer:
-                                              TapGestureRecognizer()
-                                                ..onTap = () {
-                                                  AppSettings
-                                                      .openAppSettings(
-                                                          type: AppSettingsType
-                                                              .location);
-                                                },
-                                          style: const TextStyle(
-                                            color: Colors.black,
-                                            fontWeight:
-                                                FontWeight.w300,
-                                            fontStyle:
-                                                FontStyle.normal,
-                                            fontSize: 16,
-                                          ),
-                                          text: !tappedIntoStop
-                                              ? 'Please allow Transit to access your location to improve your experience'
-                                              : '',
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ]),
-                      ),
-                      Positioned(
-                        right: 70.0,
-                        child: SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: FittedBox(
-                            child: FloatingActionButton(
-                              heroTag: 'pizzahut',
-                              onPressed: () {
-                                if (!tappedIntoStop) {
-                                  updateNextBusesForAllNearbyStops();
-                                }
-                                if (isSelected[0] == true) {
-                                  updateBuses();
-                                }
-                              },
-                              backgroundColor: Colors.grey,
-                              child: const Icon(
-                                Icons.refresh,
-                                size: 50,
-                                color:
-                                    Color.fromRGBO(255, 255, 255, 0.9),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 0.0,
-                        child: TransitLiveTimer(
-                            isLoading, timeDifference),
-                      ),
-                    ]),
-                  );
+              child: BusSheet(
+                nextBuses: nextBuses,
+                dotList: scrollSheetDotList,
+                darkModeOn: darkModeOn,
+                emptyText: scrollsheetText,
+                isLocationEnabled: isLocationEnabled,
+                tappedIntoStop: tappedIntoStop,
+                isLoading: isLoading,
+                timeDifference: timeDifference,
+                onRefresh: () {
+                  if (!tappedIntoStop) updateNextBusesForAllNearbyStops();
+                  if (isSelected[0]) updateBuses();
+                },
+                onTripTap: openWaitTimesPopup,
+                onDotChanged: (routeIndex, dot) {
+                  setState(() {
+                    scrollSheetDotList[routeIndex] = dot;
+                  });
                 },
               ),
             ),
@@ -1339,53 +868,6 @@ class _TransitAppState extends State<TransitApp> {
                 ),
               ),
             ),
-            Visibility(
-              visible: shouldShowTranslinkOutage && isSelected[0],
-              child: Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Card(
-                    child: Column(
-                      children: <Widget>[
-                        const SizedBox(height: 10),
-                        const ListTile(
-                          title:
-                              Text('Bus Locations Temporarily Unavailable'),
-                          subtitle: Text(
-                              'Due to the ongoing Translink IT outage, only next stop times are available.'),
-                        ),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: <Widget>[
-                            TextButton(
-                              child: const Text('Learn More'),
-                              onPressed: () {
-                                launchUrl(Uri.parse(
-                                  'https://www.translink.ca/news/2020/december/statement%20from%20translink%20ceo%20kevin%20desmond',
-                                ));
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                            TextButton(
-                              child: const Text('Dismiss'),
-                              onPressed: () {
-                                setState(() {
-                                  shouldShowTranslinkOutage = false;
-                                });
-                              },
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
           ]),
         ),
       );
@@ -1406,7 +888,7 @@ class _TransitAppState extends State<TransitApp> {
         });
       } else {
         setState(() {
-          clearAndAddAquarium();
+          _markers.clear();
           zoomBool = true;
         });
       }
@@ -1455,11 +937,4 @@ class _TransitAppState extends State<TransitApp> {
   }
 }
 
-///
-/// Given a HEX color string, return a Color object
-///
-Color getColorFromHex(String hexColor) {
-  final String h = hexColor.toUpperCase().replaceAll('#', '');
-  return Color(int.parse(h.length == 6 ? 'FF$h' : h, radix: 16));
-}
 

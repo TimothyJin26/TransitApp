@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:transitapp/models/Stop.dart';
 
 
@@ -17,8 +19,8 @@ class _GtfsTrip {
 
 /// Singleton that provides GTFS static data lookups.
 ///
-/// Stops are loaded from the bundled [assets/stops.txt] (fast, no network).
-/// Routes and trips are downloaded from the GTFS static ZIP once per session.
+/// On first launch, stops fall back to the bundled [assets/stops.txt].
+/// The GTFS static ZIP is cached on disk and refreshed weekly.
 class GtfsStaticService {
   static final GtfsStaticService _instance = GtfsStaticService._();
   factory GtfsStaticService() => _instance;
@@ -37,7 +39,12 @@ class GtfsStaticService {
 
   bool _stopsLoaded = false;
   bool _staticLoaded = false;
+  // Throttle failed download retries within a session (5-minute cooldown).
   DateTime? _lastStaticAttempt;
+
+  static const _cacheFileName = 'gtfs_static.zip';
+  static const _cacheTimestampFileName = 'gtfs_static_ts.txt';
+  static const _cacheMaxAgeDays = 7;
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
@@ -45,18 +52,55 @@ class GtfsStaticService {
 
   /// Must be awaited before calling any other method.
   Future<void> ensureLoaded() async {
-    if (!_stopsLoaded) {
-      await _loadStopsAsset();
-      _stopsLoaded = true;
+    if (_stopsLoaded && _staticLoaded) return;
+
+    final cacheDir = await getApplicationCacheDirectory();
+    final zipFile = File('${cacheDir.path}/$_cacheFileName');
+    final tsFile = File('${cacheDir.path}/$_cacheTimestampFileName');
+
+    // Determine if the cached ZIP is still fresh enough.
+    bool cacheValid = false;
+    if (zipFile.existsSync() && tsFile.existsSync()) {
+      final ts = DateTime.tryParse((await tsFile.readAsString()).trim());
+      cacheValid =
+          ts != null && DateTime.now().difference(ts).inDays < _cacheMaxAgeDays;
     }
-    if (!_staticLoaded) {
-      // Retry at most once every 5 minutes to avoid hammering the API.
+
+    List<int>? zipBytes;
+
+    if (cacheValid) {
+      debugPrint('GtfsStaticService: using cached ZIP (< $_cacheMaxAgeDays days old)');
+      zipBytes = await zipFile.readAsBytes();
+    } else {
+      // Only attempt download if we haven't tried recently this session.
       final now = DateTime.now();
       if (_lastStaticAttempt == null ||
           now.difference(_lastStaticAttempt!).inMinutes >= 5) {
         _lastStaticAttempt = now;
-        await _downloadStaticZip();
-        if (_routes.isNotEmpty) _staticLoaded = true;
+        zipBytes = await _downloadZipBytes();
+        if (zipBytes != null) {
+          await zipFile.writeAsBytes(zipBytes);
+          await tsFile.writeAsString(now.toIso8601String());
+          debugPrint('GtfsStaticService: saved new ZIP to cache');
+        }
+      }
+      // Graceful degradation: use stale cache if download failed.
+      if (zipBytes == null && zipFile.existsSync()) {
+        debugPrint('GtfsStaticService: download failed, using stale cache');
+        zipBytes = await zipFile.readAsBytes();
+      }
+    }
+
+    if (zipBytes != null) {
+      _parseZipBytes(zipBytes);
+      _stopsLoaded = true;
+      _staticLoaded = true;
+    } else {
+      // No ZIP at all (first launch, no network) — load stops from bundled asset.
+      if (!_stopsLoaded) {
+        debugPrint('GtfsStaticService: no ZIP available, loading stops from asset');
+        await _loadStopsAsset();
+        _stopsLoaded = true;
       }
     }
   }
@@ -78,10 +122,54 @@ class GtfsStaticService {
   String? getRouteShortName(String routeId) => _routes[routeId];
   _GtfsTrip? getTripInfo(String tripId) => _trips[tripId];
 
-  // ── Stops asset ────────────────────────────────────────────────────────────
+  // ── Download ───────────────────────────────────────────────────────────────
+
+  Future<List<int>?> _downloadZipBytes() async {
+    try {
+      debugPrint('GtfsStaticService: downloading static ZIP...');
+      final resp = await http
+          .get(Uri.parse(
+              'https://gtfs-static.translink.ca/gtfs/google_transit.zip'))
+          .timeout(const Duration(seconds: 60));
+      if (resp.statusCode != 200) {
+        debugPrint(
+            'GtfsStaticService: HTTP ${resp.statusCode} — ${resp.reasonPhrase}');
+        return null;
+      }
+      debugPrint(
+          'GtfsStaticService: downloaded ${resp.bodyBytes.length} bytes');
+      return resp.bodyBytes;
+    } catch (e) {
+      debugPrint('GtfsStaticService: download failed: $e');
+      return null;
+    }
+  }
+
+  // ── Parsing ────────────────────────────────────────────────────────────────
+
+  void _parseZipBytes(List<int> bytes) {
+    final archive = ZipDecoder().decodeBytes(bytes);
+    for (final file in archive) {
+      if (!file.isFile) continue;
+      final name = file.name.toLowerCase().split('/').last;
+      final content =
+          utf8.decode(file.content as List<int>, allowMalformed: true);
+      if (name == 'stops.txt') _parseStops(content);
+      if (name == 'routes.txt') _parseRoutes(content);
+      if (name == 'trips.txt') _parseTrips(content);
+    }
+    debugPrint(
+        'GtfsStaticService: ${_allStops.length} stops, ${_routes.length} routes, ${_trips.length} trips');
+  }
+
+  // ── Stops asset (fallback) ─────────────────────────────────────────────────
 
   Future<void> _loadStopsAsset() async {
     final csv = await rootBundle.loadString('assets/stops.txt');
+    _parseStops(csv);
+  }
+
+  void _parseStops(String csv) {
     final lines = csv.split('\n');
     if (lines.isEmpty) return;
 
@@ -120,7 +208,7 @@ class GtfsStaticService {
         atStreet = '';
       }
 
-      final s = Stop(
+      _allStops.add(Stop(
         StopNo: stopCode,
         Name: name,
         OnStreet: onStreet,
@@ -130,37 +218,7 @@ class GtfsStaticService {
         WheelchairAccess: wchCol >= 0 && wchCol < row.length
             ? int.tryParse(row[wchCol].trim())
             : null,
-      );
-      _allStops.add(s);
-    }
-  }
-
-  // ── GTFS static ZIP (routes + trips) ──────────────────────────────────────
-
-  Future<void> _downloadStaticZip() async {
-    try {
-      debugPrint('GtfsStaticService: downloading static ZIP...');
-      final resp = await http
-          .get(Uri.parse(
-              'https://gtfs-static.translink.ca/gtfs/google_transit.zip'))
-          .timeout(const Duration(seconds: 60));
-      if (resp.statusCode != 200) {
-        debugPrint('GtfsStaticService: HTTP ${resp.statusCode} — ${resp.reasonPhrase}');
-        return;
-      }
-
-      debugPrint('GtfsStaticService: downloaded ${resp.bodyBytes.length} bytes, decoding...');
-      final archive = ZipDecoder().decodeBytes(resp.bodyBytes);
-      for (final file in archive) {
-        if (!file.isFile) continue;
-        final name = file.name.toLowerCase().split('/').last;
-        final content = utf8.decode(file.content as List<int>, allowMalformed: true);
-        if (name == 'routes.txt') _parseRoutes(content);
-        if (name == 'trips.txt') _parseTrips(content);
-      }
-      debugPrint('GtfsStaticService: loaded ${_routes.length} routes, ${_trips.length} trips');
-    } catch (e) {
-      debugPrint('GtfsStaticService: static ZIP download failed: $e');
+      ));
     }
   }
 
@@ -213,7 +271,6 @@ class GtfsStaticService {
 
   /// Split a CSV row, respecting double-quoted fields.
   static List<String> _csvRow(String line) {
-    // Strip trailing \r
     if (line.endsWith('\r')) line = line.substring(0, line.length - 1);
     final fields = <String>[];
     final buf = StringBuffer();
@@ -237,8 +294,7 @@ class GtfsStaticService {
   static double _distM(double lat1, double lng1, double lat2, double lng2) {
     const degToRad = pi / 180;
     final dLat = (lat2 - lat1) * 111000;
-    final dLng =
-        (lng2 - lng1) * 111000 * cos(lat1 * degToRad);
+    final dLng = (lng2 - lng1) * 111000 * cos(lat1 * degToRad);
     return sqrt(dLat * dLat + dLng * dLng);
   }
 }

@@ -50,8 +50,8 @@ class BusAtStopFetcher {
         }
 
         final trip = Trip(
-          Pattern: tu.directionId == 0 ? 'Outbound' : 'Inbound',
-          Destination: (tripInfo?.headsign ?? '').toUpperCase(),
+          Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tu.directionId),
+          Destination: GtfsUtil.stripHeadsignPrefix(tripInfo?.headsign ?? '').toUpperCase(),
           ExpectedCountdown: countdown,
           LastUpdate: DateTime.now().toIso8601String(),
           RouteNo: routeNo,

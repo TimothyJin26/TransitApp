@@ -10,6 +10,22 @@ class GtfsUtil {
     return '$h:$m $period';
   }
 
+  /// Derive a direction pattern code from a stop's onStreet name.
+  /// e.g. "Westbound Hastings St" → "W", falls back to "Outbound"/"Inbound".
+  static String directionFromStop(String? onStreet, int directionId) {
+    final s = onStreet?.trim().toLowerCase() ?? '';
+    if (s.startsWith('westbound')) return 'W';
+    if (s.startsWith('eastbound')) return 'E';
+    if (s.startsWith('northbound')) return 'N';
+    if (s.startsWith('southbound')) return 'S';
+    return directionId == 0 ? 'Outbound' : 'Inbound';
+  }
+
+  /// Strip TransLink's leading route-number prefix from a trip headsign.
+  /// e.g. "014 UBC Exchange" → "UBC Exchange"
+  static String stripHeadsignPrefix(String headsign) =>
+      headsign.replaceFirst(RegExp(r'^\d+\s+'), '');
+
   /// Build the nextStop display string from a stop's street fields.
   static String nextStopLabel(
       {required String? name,
