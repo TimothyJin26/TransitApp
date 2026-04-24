@@ -167,7 +167,7 @@ class BusSheet extends StatelessWidget {
                     onPressed: onCenterLocation,
                     backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
                     child: const Icon(
-                      Icons.my_location,
+                      Icons.near_me_outlined,
                       size: 24,
                       color: Color.fromRGBO(0, 0, 0, 1),
                     ),
