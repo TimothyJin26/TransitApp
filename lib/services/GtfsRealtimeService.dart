@@ -19,6 +19,11 @@ class GtfsRealtimeService {
   // Index: stop_id → list of (tripUpdate, stopTimeUpdate) for fast lookup
   Map<String, List<_StopEntry>>? _tripUpdateIndex;
 
+  void invalidateCache() {
+    _tripUpdatesAt = null;
+    _tripUpdateIndex = null;
+  }
+
   Future<List<GtfsTripUpdate>> getTripUpdates() async {
     if (_isFresh(_tripUpdatesAt) && _tripUpdates != null) return _tripUpdates!;
     try {

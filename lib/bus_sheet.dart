@@ -16,6 +16,7 @@ class BusSheet extends StatelessWidget {
   final bool isLoading;
   final Duration timeDifference;
   final VoidCallback onRefresh;
+  final VoidCallback onCenterLocation;
   final Future<void> Function(String routeNo, String pattern, String stopNo) onTripTap;
   final void Function(int routeIndex, int dotIndex) onDotChanged;
 
@@ -30,6 +31,7 @@ class BusSheet extends StatelessWidget {
     required this.isLoading,
     required this.timeDifference,
     required this.onRefresh,
+    required this.onCenterLocation,
     required this.onTripTap,
     required this.onDotChanged,
   });
@@ -43,9 +45,9 @@ class BusSheet extends StatelessWidget {
       builder: (context, scrollController) {
         return Container(
           color: Colors.deepOrangeAccent.withAlpha(0),
-          child: Stack(children: [
+          child: Stack(clipBehavior: Clip.none, children: [
             Container(
-              margin: const EdgeInsets.fromLTRB(0.0, 27.0, 0.0, 0.0),
+              margin: const EdgeInsets.fromLTRB(0.0, 50.0, 0.0, 0.0),
               color: darkModeOn
                   ? getColorFromHex('1b2336').withAlpha(252)
                   : Colors.white.withAlpha(252),
@@ -118,27 +120,60 @@ class BusSheet extends StatelessWidget {
               ]),
             ),
             Positioned(
-              right: 70.0,
+              left: 7.0,
+              top: -7.0,
               child: SizedBox(
-                height: 24,
-                width: 24,
+                height: 50,
+                width: 50,
                 child: FittedBox(
                   child: FloatingActionButton(
-                    heroTag: 'pizzahut',
+                    heroTag: 'refreshBtn',
+                    shape: const CircleBorder(),
                     onPressed: onRefresh,
-                    backgroundColor: Colors.grey,
-                    child: const Icon(
-                      Icons.refresh,
-                      size: 50,
-                      color: Color.fromRGBO(255, 255, 255, 0.9),
-                    ),
+                    backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
+                    child: isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.black54,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.refresh,
+                            size: 24,
+                            color: Color.fromRGBO(0, 0, 0, 1),
+                          ),
                   ),
                 ),
               ),
             ),
             Positioned(
-              right: 0.0,
+              left: 65.0,
+              top: 17.0,
               child: TransitLiveTimer(isLoading, timeDifference),
+            ),
+            Positioned(
+              right: 7.0,
+              top: -7.0,
+              child: SizedBox(
+                height: 50,
+                width: 50,
+                child: FittedBox(
+                  child: FloatingActionButton(
+                    heroTag: 'centerLocation',
+                    shape: const CircleBorder(),
+                    onPressed: onCenterLocation,
+                    backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
+                    child: const Icon(
+                      Icons.my_location,
+                      size: 24,
+                      color: Color.fromRGBO(0, 0, 0, 1),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ]),
         );

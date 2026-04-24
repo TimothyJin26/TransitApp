@@ -14,6 +14,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
@@ -70,6 +71,7 @@ class _TransitAppState extends State<TransitApp> {
   var isLocationEnabled = true;
   var scrollSheetDotList = [];
   var tappedIntoStop = false;
+  Stop? _tappedStop;
   Position? userLocation;
   List<BothDirectionRouteWithTrips>? nextBusesCopy;
   List? scrollSheetDotListCopy;
@@ -373,6 +375,7 @@ class _TransitAppState extends State<TransitApp> {
                   List<dynamic>.from(scrollSheetDotList);
             }
             tappedIntoStop = true;
+            _tappedStop = stop;
             count = 2;
             BusAtSingleStopFetcher()
                 .busAtSingleStopFetcher(stop, stop.StopNo.toString())
@@ -394,7 +397,20 @@ class _TransitAppState extends State<TransitApp> {
     return l;
   }
 
+  void _refreshTappedStop() {
+    final stop = _tappedStop;
+    if (stop == null) return;
+    setState(() { isLoading = true; });
+    BusAtSingleStopFetcher()
+        .busAtSingleStopFetcher(stop, stop.StopNo.toString())
+        .then((value) {
+      renderListOfNextBuses(value);
+      setState(() { isLoading = false; });
+    });
+  }
+
   void updateNextBusesForAllNearbyStops() async {
+    setState(() { isLoading = true; });
     Position locationData;
     try {
       locationData = await getLocation();
@@ -405,6 +421,7 @@ class _TransitAppState extends State<TransitApp> {
     } catch (e) {
       setState(() {
         isLocationEnabled = false;
+        isLoading = false;
         scrollsheetText = 'Location Services Disabled';
       });
       return;
@@ -724,35 +741,6 @@ class _TransitAppState extends State<TransitApp> {
             ),
             Visibility(
               visible: !showingSpecificBuses,
-              child: Positioned(
-                top: 170,
-                right: 7,
-                left: 7,
-                child: Align(
-                  alignment: Alignment.bottomRight,
-                  child: SizedBox(
-                    height: 50,
-                    width: 50,
-                    child: FittedBox(
-                      child: FloatingActionButton(
-                        heroTag: 'centerLocation',
-                        shape: const CircleBorder(),
-                        onPressed: _currentLocation,
-                        backgroundColor:
-                            const Color.fromRGBO(255, 255, 255, 1),
-                        child: const Icon(
-                          Icons.my_location,
-                          size: 24,
-                          color: Color.fromRGBO(0, 0, 0, 1),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Visibility(
-              visible: !showingSpecificBuses,
               child: BusSheet(
                 nextBuses: nextBuses,
                 dotList: scrollSheetDotList,
@@ -763,9 +751,16 @@ class _TransitAppState extends State<TransitApp> {
                 isLoading: isLoading,
                 timeDifference: timeDifference,
                 onRefresh: () {
-                  if (!tappedIntoStop) updateNextBusesForAllNearbyStops();
-                  if (isSelected[0]) updateBuses();
+                  GtfsRealtimeService().invalidateCache();
+                  timeLastUpdated = DateTime.now();
+                  if (tappedIntoStop) {
+                    _refreshTappedStop();
+                  } else {
+                    updateNextBusesForAllNearbyStops();
+                    if (isSelected[0]) updateBuses();
+                  }
                 },
+                onCenterLocation: _currentLocation,
                 onTripTap: openWaitTimesPopup,
                 onDotChanged: (routeIndex, dot) {
                   setState(() {
@@ -807,6 +802,7 @@ class _TransitAppState extends State<TransitApp> {
                               List<dynamic>.from(scrollSheetDotList);
                         }
                         tappedIntoStop = true;
+                        _tappedStop = post;
                         isSelected = [false, true];
                         BusAtSingleStopFetcher()
                             .busAtSingleStopFetcher(
