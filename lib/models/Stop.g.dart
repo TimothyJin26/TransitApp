@@ -6,20 +6,19 @@ part of 'Stop.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-Stop _$StopFromJson(Map<String, dynamic> json) {
-  return Stop(
-      StopNo: json['StopNo'] as int,
-      Name: json['Name'] as String,
-      BayNo: json['BayNo'] as String,
-      City: json['City'] as String,
-      OnStreet: json['OnStreet'] as String,
-      AtStreet: json['AtStreet'] as String,
-      Latitude: (json['Latitude'] as num)?.toDouble(),
-      Longitude: (json['Longitude'] as num)?.toDouble(),
-      WheelchairAccess: json['WheelchairAccess'] as int,
-      Distance: json['Distance'] as int,
-      Routes: json['Routes'] as String);
-}
+Stop _$StopFromJson(Map<String, dynamic> json) => Stop(
+      StopNo: (json['StopNo'] as num?)?.toInt(),
+      Name: json['Name'] as String?,
+      BayNo: json['BayNo'] as String?,
+      City: json['City'] as String?,
+      OnStreet: json['OnStreet'] as String?,
+      AtStreet: json['AtStreet'] as String?,
+      Latitude: (json['Latitude'] as num?)?.toDouble(),
+      Longitude: (json['Longitude'] as num?)?.toDouble(),
+      WheelchairAccess: (json['WheelchairAccess'] as num?)?.toInt(),
+      Distance: (json['Distance'] as num?)?.toInt(),
+      Routes: json['Routes'] as String?,
+    );
 
 Map<String, dynamic> _$StopToJson(Stop instance) => <String, dynamic>{
       'StopNo': instance.StopNo,
@@ -32,5 +31,5 @@ Map<String, dynamic> _$StopToJson(Stop instance) => <String, dynamic>{
       'Longitude': instance.Longitude,
       'WheelchairAccess': instance.WheelchairAccess,
       'Distance': instance.Distance,
-      'Routes': instance.Routes
+      'Routes': instance.Routes,
     };

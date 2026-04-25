@@ -1,108 +1,117 @@
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/http.dart';
-import 'package:json_annotation/json_annotation.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
 
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/models/Trip.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
+import 'package:transitapp/util/GtfsUtil.dart';
 
 class BusAtStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busFetcher(
-      List<Stop> stopList, double Lat, double Lng) async {
-    print(DateTime.now().toString() + " START OF BUS FETCHER at " + Lat.toString() + " ; " + Lng.toString() + " and stoplist of size " + stopList.length.toString());
-    List<BothDirectionRouteWithTrips> routeTrips = new List<BothDirectionRouteWithTrips>(); // Gets stops that are closest to the user
-    List<Stop> shortestDistance = new List<Stop>();
+      List<Stop> stopList, double lat, double lng) async {
+    await GtfsStaticService().ensureLoaded();
+
     stopList.sort((a, b) {
-      var distanceLatA = pow(a.Latitude - Lat, 2);
-      var distanceLatB = pow(b.Latitude - Lat, 2);
-      var distanceLongA = pow(a.Longitude - Lng, 2);
-      var distanceLongB = pow(b.Longitude - Lng, 2);
-      var distanceA = sqrt(distanceLatA + distanceLongA);
-      var distanceB = sqrt(distanceLatB + distanceLongB);
-      return distanceA.compareTo(distanceB);
+      final dA = sqrt(pow((a.Latitude ?? 0) - lat, 2) +
+          pow((a.Longitude ?? 0) - lng, 2));
+      final dB = sqrt(pow((b.Latitude ?? 0) - lat, 2) +
+          pow((b.Longitude ?? 0) - lng, 2));
+      return dA.compareTo(dB);
     });
+    final nearest = stopList.sublist(0, min(stopList.length, 6));
 
-    shortestDistance = stopList.sublist(0, min(stopList.length, 6));
+    final static_ = GtfsStaticService();
+    final rt = GtfsRealtimeService();
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final List<BothDirectionRouteWithTrips> routeTrips = [];
 
-    //  Go through every stop to fetch the next buses
+    for (final stop in nearest) {
+      final stopId = static_.getStopId(stop.StopNo ?? 0);
+      if (stopId == null) continue;
 
-    List<Future<Response>> futures = [];
+      final realtimeTripIds = <String>{};
 
-    for (Stop stop in shortestDistance) {
-      String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/' +
-          stop.StopNo.toString() +
-          '/estimates?apikey=perA9biw6Ipc8aobcMa3';
-      Map<String, String> requestHeaders = {
-        'Accept': 'application/json',
-      };
+      final entries = await rt.getDeparturesForStop(stopId);
+      for (final entry in entries) {
+        final tu = entry.tripUpdate;
+        final stu = entry.stopTimeUpdate;
 
-      futures.add(http.get(stopLocationsURL, headers: requestHeaders));
-      print("GETTING STOP " + stop.StopNo.toString() + " " + stop.Name);
-    }
-    var counter = 0;
-    for(Future<Response> r in futures) {
-      Response response = await r;
-      if (response.statusCode == 200) {
-        List<dynamic> jsonStops = (json.decode(response.body) as List);
-        for (int i = 0; i < jsonStops.length; i++) {
-          // Go through each of the next buses for the stop
-          SingleDirectionRouteWithTrips routeObjects =
-              SingleDirectionRouteWithTrips.fromJson(jsonStops[i]);
-          var remove = [];
-          int count = 0;
-          for (Trip t in routeObjects.Schedules) {
-            if(t.ExpectedCountdown<0){
-              //removes negative countdowns
-              remove.add(count);
-            }
-            if (shortestDistance[counter].AtStreet == null||shortestDistance[counter].OnStreet == null) {
-              t.nextStop = shortestDistance[counter].Name;
-              t.StopNo = shortestDistance[counter].StopNo.toString();
-            } else{
-              t.nextStop = shortestDistance[counter].AtStreet.trim() + " and \n" + shortestDistance[counter].OnStreet.trim().substring(shortestDistance[counter].OnStreet.indexOf(" ")+1);
-              t.StopNo = shortestDistance[counter].StopNo.toString();
-            }
-            count++;
-          }
-          for(int i=remove.length-1;i>=0;i--){
-            routeObjects.Schedules.removeAt(remove[i]);
-          }
-          List<String> list = new List<String>();
-          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-            list.add(routeTrip.RouteNo);
-          }
-          print("---");
-          print(routeObjects.RouteNo);
-          for (var s in routeObjects.Schedules) {
-            print("   " + s.Destination);
-          }
-          print("---");
-          if (!list.contains(routeObjects.RouteNo)) {
-            routeTrips.add(new BothDirectionRouteWithTrips(
-                routeObjects.RouteNo, routeObjects.Schedules));
-          } else {
-            for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-              if (routeTrip.RouteNo == routeObjects.RouteNo) {
-                routeTrip.Trips.addAll(routeObjects.Schedules);
-                break;
-              }
-            }
-          }
+        final departureTime = stu.time;
+        if (departureTime == null) continue;
+        final countdown = ((departureTime - nowSec) / 60).floor();
+        if (countdown < 0 || countdown > 90) continue;
+
+        realtimeTripIds.add(tu.tripId);
+
+        final tripInfo = static_.getTripInfo(tu.tripId);
+        final routeId =
+            tu.routeId.isNotEmpty ? tu.routeId : (tripInfo?.routeId ?? '');
+        String routeNo = static_.getRouteShortName(routeId) ?? routeId;
+        while (routeNo.startsWith('0')) routeNo = routeNo.substring(1);
+
+        final trip = Trip(
+          Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tu.directionId),
+          Destination: GtfsUtil.stripHeadsignPrefix(tripInfo?.headsign ?? '').toUpperCase(),
+          ExpectedCountdown: countdown,
+          LastUpdate: DateTime.now().toIso8601String(),
+          RouteNo: routeNo,
+          ExpectedLeaveTime: GtfsUtil.formatTime(departureTime),
+        );
+        trip.nextStop = GtfsUtil.nextStopLabel(
+          name: stop.Name,
+          onStreet: stop.OnStreet,
+          atStreet: stop.AtStreet,
+        );
+        trip.StopNo = stop.StopNo.toString();
+
+        final idx = routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+        if (idx < 0) {
+          routeTrips.add(BothDirectionRouteWithTrips(routeNo, [trip]));
+        } else {
+          routeTrips[idx].Trips.add(trip);
         }
-      } else {
-        print("Could not get info for stop " + shortestDistance[counter].StopNo.toString());
       }
-      counter++;
+
+      // Supplement with scheduled departures for trips not in the realtime feed
+      final scheduled = static_.getScheduledDepartures(stopId);
+      for (final (tripId, epochSec) in scheduled) {
+        if (realtimeTripIds.contains(tripId)) continue;
+
+        final countdown = ((epochSec - nowSec) / 60).floor();
+        if (countdown < 0 || countdown > 90) continue;
+
+        final tripInfo = static_.getTripInfo(tripId);
+        if (tripInfo == null) continue;
+
+        String routeNo = static_.getRouteShortName(tripInfo.routeId) ?? tripInfo.routeId;
+        while (routeNo.startsWith('0')) routeNo = routeNo.substring(1);
+        if (routeNo.isEmpty) continue;
+
+        final trip = Trip(
+          Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tripInfo.directionId),
+          Destination: GtfsUtil.stripHeadsignPrefix(tripInfo.headsign).toUpperCase(),
+          ExpectedCountdown: countdown,
+          LastUpdate: DateTime.now().toIso8601String(),
+          RouteNo: routeNo,
+          ExpectedLeaveTime: GtfsUtil.formatTime(epochSec),
+        );
+        trip.nextStop = GtfsUtil.nextStopLabel(
+          name: stop.Name,
+          onStreet: stop.OnStreet,
+          atStreet: stop.AtStreet,
+        );
+        trip.StopNo = stop.StopNo.toString();
+
+        final idx = routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+        if (idx < 0) {
+          routeTrips.add(BothDirectionRouteWithTrips(routeNo, [trip]));
+        } else {
+          routeTrips[idx].Trips.add(trip);
+        }
+      }
     }
 
-    print(DateTime.now().toString() + " END OF BUS FETCHER");
     return routeTrips;
   }
 }

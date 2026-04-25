@@ -1,73 +1,105 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/cupertino.dart';
-import 'package:http/http.dart' as http;
-import 'package:json_annotation/json_annotation.dart';
-import 'package:transitapp/models/SingleDirectionRouteWithTrips.dart';
-
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Stop.dart';
 import 'package:transitapp/models/Trip.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
+import 'package:transitapp/util/GtfsUtil.dart';
 
 class BusAtSingleStopFetcher {
   Future<List<BothDirectionRouteWithTrips>> busAtSingleStopFetcher(
       Stop stop, String busStopNum) async {
-    List<BothDirectionRouteWithTrips> routeTrips =
-        new List<BothDirectionRouteWithTrips>();
+    await GtfsStaticService().ensureLoaded();
 
-    String stopLocationsURL = 'https://api.translink.ca/rttiapi/v1/stops/' +
-        busStopNum +
-        '/estimates?apikey=perA9biw6Ipc8aobcMa3';
-    Map<String, String> requestHeaders = {
-      'Accept': 'application/json',
-    };
+    final stopCode = int.tryParse(busStopNum);
+    if (stopCode == null) return [];
+    final stopId = GtfsStaticService().getStopId(stopCode);
+    if (stopId == null) return [];
 
-    try {
-      final response = await http
-          .get(stopLocationsURL, headers: requestHeaders)
-          .timeout(Duration(seconds: 3));
+    final entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final static_ = GtfsStaticService();
+    final List<BothDirectionRouteWithTrips> routeTrips = [];
 
-      if (response.statusCode == 200) {
-        List<dynamic> listOfTripsJson = (json.decode(response.body) as List);
-//        List<RouteID> routeIDs = [];
+    final realtimeTripIds = <String>{};
 
-        for (int i = 0; i < listOfTripsJson.length; i++) {
-          SingleDirectionRouteWithTrips greatFamine =
-              SingleDirectionRouteWithTrips.fromJson(listOfTripsJson[i]);
-          for (Trip t in greatFamine.Schedules) {
-            if (stop.AtStreet == null || stop.OnStreet == null) {
-              t.nextStop = stop.Name;
-              t.StopNo = stop.StopNo.toString();
-            } else {
-              t.nextStop = stop.AtStreet + " and \n" + stop.OnStreet;
-              t.StopNo = stop.StopNo.toString();
-            }
-          }
+    for (final entry in entries) {
+      final tu = entry.tripUpdate;
+      final stu = entry.stopTimeUpdate;
 
-          List<String> list = new List<String>();
-          for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-            list.add(routeTrip.RouteNo);
-          }
-          if (!list.contains(greatFamine.RouteNo)) {
-            routeTrips.add(new BothDirectionRouteWithTrips(
-                greatFamine.RouteNo, greatFamine.Schedules));
-          } else {
-            for (BothDirectionRouteWithTrips routeTrip in routeTrips) {
-              if (routeTrip.RouteNo == greatFamine.RouteNo) {
-                routeTrip.Trips.addAll(greatFamine.Schedules);
-              }
-            }
-          }
-//          routeIDs.add(greatFamine);
-        }
-      } else {
-        print("else");
-        return [];
+      final departureTime = stu.time;
+      if (departureTime == null) continue;
+      final countdown = ((departureTime - nowSec) / 60).floor();
+      if (countdown < 0) continue;
+
+      realtimeTripIds.add(tu.tripId);
+
+      final tripInfo = static_.getTripInfo(tu.tripId);
+      final routeId =
+          tu.routeId.isNotEmpty ? tu.routeId : (tripInfo?.routeId ?? '');
+      String routeNo = static_.getRouteShortName(routeId) ?? routeId;
+      while (routeNo.startsWith('0')) {
+        routeNo = routeNo.substring(1);
       }
-    } on TimeoutException catch (e) {
-      print("TimeoutException");
-      return [];
+
+      final trip = Trip(
+        Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tu.directionId),
+        Destination: GtfsUtil.stripHeadsignPrefix(tripInfo?.headsign ?? '').toUpperCase(),
+        ExpectedCountdown: countdown,
+        LastUpdate: DateTime.now().toIso8601String(),
+        RouteNo: routeNo,
+        ExpectedLeaveTime: GtfsUtil.formatTime(departureTime),
+      );
+      trip.nextStop = GtfsUtil.nextStopLabel(
+        name: stop.Name,
+        onStreet: stop.OnStreet,
+        atStreet: stop.AtStreet,
+      );
+      trip.StopNo = stop.StopNo.toString();
+
+      final idx = routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+      if (idx < 0) {
+        routeTrips.add(BothDirectionRouteWithTrips(routeNo, [trip]));
+      } else {
+        routeTrips[idx].Trips.add(trip);
+      }
+    }
+
+    // Supplement with scheduled departures for trips not in the realtime feed
+    final scheduled = static_.getScheduledDepartures(stopId);
+    for (final (tripId, epochSec) in scheduled) {
+      if (realtimeTripIds.contains(tripId)) continue;
+
+      final countdown = ((epochSec - nowSec) / 60).floor();
+      if (countdown < 0 || countdown > 90) continue;
+
+      final tripInfo = static_.getTripInfo(tripId);
+      if (tripInfo == null) continue;
+
+      String routeNo = static_.getRouteShortName(tripInfo.routeId) ?? tripInfo.routeId;
+      while (routeNo.startsWith('0')) routeNo = routeNo.substring(1);
+      if (routeNo.isEmpty) continue;
+
+      final trip = Trip(
+        Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tripInfo.directionId),
+        Destination: GtfsUtil.stripHeadsignPrefix(tripInfo.headsign).toUpperCase(),
+        ExpectedCountdown: countdown,
+        LastUpdate: DateTime.now().toIso8601String(),
+        RouteNo: routeNo,
+        ExpectedLeaveTime: GtfsUtil.formatTime(epochSec),
+      );
+      trip.nextStop = GtfsUtil.nextStopLabel(
+        name: stop.Name,
+        onStreet: stop.OnStreet,
+        atStreet: stop.AtStreet,
+      );
+      trip.StopNo = stop.StopNo.toString();
+
+      final idx = routeTrips.indexWhere((r) => r.RouteNo == routeNo);
+      if (idx < 0) {
+        routeTrips.add(BothDirectionRouteWithTrips(routeNo, [trip]));
+      } else {
+        routeTrips[idx].Trips.add(trip);
+      }
     }
 
     return routeTrips;

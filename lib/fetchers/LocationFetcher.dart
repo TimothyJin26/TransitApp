@@ -1,110 +1,76 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:json_annotation/json_annotation.dart';
-import 'dart:developer';
+import 'package:flutter/foundation.dart';
 import 'package:transitapp/models/Bus.dart';
-import 'package:transitapp/models/Stop.dart';
-import 'package:transitapp/fetchers/StopFetcher.dart';
+import 'package:transitapp/models/RouteLink.dart';
+import 'package:transitapp/services/GtfsRealtimeService.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
 
 class LocationFetcher {
-  /**
-   * Fetches the locations of all active buses
-   */
+  /// Fetches the locations of all active buses from the GTFS RT position feed.
   Future<List<Bus>> fetchAllBuses() async {
-    print('Fetching all buses');
-    String busLocationsURL =
-        'https://api.translink.ca/rttiapi/v1/buses?apikey=perA9biw6Ipc8aobcMa3';
-    Map<String, String> requestHeaders = {
-      'Accept': 'application/json',
-    };
-    try {
-      // Retrieve the locations of bus locations
-      final response = await http.get(busLocationsURL, headers: requestHeaders);
+    await GtfsStaticService().ensureLoaded();
 
-      if (response.statusCode == 200) {
-        print("Finished fetching all buses");
-        List<dynamic> jsonBuses = (json.decode(response.body) as List);
-        List<Bus> buses = [];
-        print("Total buses = " + jsonBuses.length.toString());
-        for (int i = 0; i < jsonBuses.length; i++) {
-          Bus irishpotato = Bus.fromJson(jsonBuses[i]);
-          while (irishpotato.RouteNo.startsWith("0")) {
-            irishpotato.RouteNo = irishpotato.RouteNo.substring(1);
-          }
-          buses.add(irishpotato);
-        }
-        print("Finished parsing all buses");
-
-        return buses;
-      } else if (response.statusCode == 404) {
-        List<Bus> buses = [];
-        return buses;
-      } else {
-        return [];
-      }
-    } on TimeoutException catch (e) {
-      print("TimeoutException");
-      return [];
+    final vehicles = await GtfsRealtimeService().getVehiclePositions();
+    final static_ = GtfsStaticService();
+    final bool routesLoaded = static_.hasRoutesLoaded;
+    if (!routesLoaded) {
+      debugPrint('LocationFetcher: GTFS static routes not loaded — bus markers will show raw route_id');
     }
-    // TODO
+    final List<Bus> buses = [];
+
+    for (final v in vehicles) {
+      final tripInfo = static_.getTripInfo(v.tripId);
+      final routeId =
+          v.routeId.isNotEmpty ? v.routeId : (tripInfo?.routeId ?? '');
+      String routeNo = static_.getRouteShortName(routeId) ?? routeId;
+      if (!routesLoaded && buses.isEmpty && routeId.isNotEmpty) {
+        debugPrint('LocationFetcher: sample routeId="$routeId" tripId="${v.tripId}" vehicleId="${v.vehicleId}"');
+      }
+      if (routesLoaded && static_.getRouteShortName(routeId) == null && routeId.isNotEmpty) {
+        debugPrint('LocationFetcher: no route name for routeId="$routeId" tripId="${v.tripId}"');
+      }
+      while (routeNo.startsWith('0')) {
+        routeNo = routeNo.substring(1);
+      }
+
+      final destination = (tripInfo?.headsign ?? '').toUpperCase();
+      final directionId = tripInfo?.directionId ?? 0;
+      final direction = _bearingToDirection(v.bearing) ??
+          (directionId == 0 ? 'OUTBOUND' : 'INBOUND');
+
+      // Reconstruct KMZ URL so route polylines keep working.
+      final kmzUrl = _buildKmzUrl(routeNo);
+
+      buses.add(Bus(
+        VehicleNo: v.vehicleId,
+        TripId: int.tryParse(v.tripId),
+        RouteNo: routeNo,
+        Direction: direction,
+        Destination: destination,
+        Pattern: '${direction[0]}B1',
+        Latitude: v.latitude,
+        Longitude: v.longitude,
+        RecordedTime: DateTime.now().toString(),
+        RouteMap: RouteLink(Href: kmzUrl),
+      ));
+    }
+
+    return buses;
   }
 
-  /**
-   * Fetches the buses for a bus stop given a lat and lng
-   */
-  Future<List<Bus>> busFetcherBasedOnLocation(
-      String latitude, String longitude) async {
-    List<Bus> globalListofBuses = new List<Bus>();
-    StopFetcher stopFetcher = new StopFetcher();
-    List<Stop> listOfStops = await stopFetcher.stopFetcher(latitude, longitude);
-    print("Found stops: " + listOfStops.length.toString());
-    for (int o = 0; o < listOfStops.length; o++) {
-      print("Trying to fetch stop: " + listOfStops[o].StopNo.toString());
-      List<Bus> listOfBuses =
-          await busFetcher(listOfStops[o].StopNo.toString());
-      globalListofBuses.addAll(listOfBuses);
-    }
-    return globalListofBuses;
+  static String? _bearingToDirection(double? bearing) {
+    if (bearing == null) return null;
+    final b = bearing % 360;
+    if (b < 45 || b >= 315) return 'NORTH';
+    if (b < 135) return 'EAST';
+    if (b < 225) return 'SOUTH';
+    return 'WEST';
   }
 
-  /**
-   * Fetches the buses for a bus stop given a bus stop number
-   */
-  Future<List<Bus>> busFetcher(String busStopNum) async {
-    try {
-      String busLocationsURL =
-          'https://api.translink.ca/rttiapi/v1/buses?apikey=i9U837R3QcSl2OhZpJm0&stopNo=' +
-              busStopNum;
-      Map<String, String> requestHeaders = {
-        'Accept': 'application/json',
-      };
-
-      // Retrieve the locations of bus locations
-      final response = await http.get(busLocationsURL, headers: requestHeaders);
-
-      if (response.statusCode == 200) {
-        List<dynamic> jsonBuses = (json.decode(response.body) as List);
-        List<Bus> buses = [];
-        for (int i = 0; i < jsonBuses.length; i++) {
-          Bus irishpotato = Bus.fromJson(jsonBuses[i]);
-          buses.add(irishpotato);
-        }
-
-        return buses;
-      } else if (response.statusCode == 404) {
-        List<Bus> buses = [];
-        return buses;
-      } else {
-        throw HttpException(
-            'Unexpected status code ${response.statusCode}:'
-            ' ${response.reasonPhrase}',
-            uri: Uri.parse(busLocationsURL));
-      }
-    } on TimeoutException catch (e) {
-      print("TimeoutException");
-      return [];
+  static String _buildKmzUrl(String routeNo) {
+    final num = int.tryParse(routeNo);
+    if (num != null) {
+      return 'https://nb.translink.ca/geodata/${routeNo.padLeft(3, '0')}.kmz';
     }
+    return 'https://nb.translink.ca/geodata/$routeNo.kmz';
   }
 }
