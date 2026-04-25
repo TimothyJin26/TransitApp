@@ -23,6 +23,7 @@ class RouteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       key: Key(route.RouteNo.toString()),
+      contentPadding: EdgeInsets.zero,
       title: Column(children: [
         CarouselSlider(
           options: CarouselOptions(
@@ -38,12 +39,14 @@ class RouteTile extends StatelessWidget {
                   trip.Pattern ?? '',
                   trip.StopNo ?? '',
                 ),
-                child: Row(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      width: 70,
+                      width: 80,
                       child: Text(
                         removeZeroes(route.RouteNo),
                         textAlign: TextAlign.center,
@@ -106,6 +109,7 @@ class RouteTile extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
                 ),
               ),
             );
