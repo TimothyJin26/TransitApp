@@ -42,11 +42,17 @@ class StopSearchBarState extends State<StopSearchBar> {
   List<Stop> _results = [];
   bool _loading = false;
   bool _active = false;
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller?._state = this;
+    _textController.addListener(() {
+      setState(() {
+        _isTyping = _textController.text.isNotEmpty;
+      });
+    });
   }
 
   // Called by the cancel button — also dismisses the keyboard.
@@ -85,7 +91,11 @@ class StopSearchBarState extends State<StopSearchBar> {
     });
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       final results = await widget.onSearch(text);
-      if (mounted) setState(() { _results = results; _loading = false; });
+      if (mounted)
+        setState(() {
+          _results = results;
+          _loading = false;
+        });
     });
   }
 
@@ -115,20 +125,21 @@ class StopSearchBarState extends State<StopSearchBar> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: Colors.black12),
                   ),
-                  padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 0, 0),
                   child: TextField(
                     controller: _textController,
                     focusNode: _focusNode,
                     onChanged: _onChanged,
                     style: const TextStyle(fontSize: 18),
                     decoration: InputDecoration(
-                      icon: const Icon(Icons.search),
+                      icon: _isTyping ? null : const Icon(Icons.search),
+                      hintText: _isTyping ? '' : widget.hintText,
+
                       border: InputBorder.none,
-                      hintText: widget.hintText,
+                      contentPadding: EdgeInsets.zero,
                       hintStyle: const TextStyle(
                         color: Color.fromRGBO(142, 142, 147, 1),
                       ),
-                      contentPadding: const EdgeInsets.fromLTRB(0, 5, 0, 0),
                     ),
                   ),
                 ),
