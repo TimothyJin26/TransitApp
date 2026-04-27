@@ -110,68 +110,102 @@ class StopSearchBarState extends State<StopSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final containerColor = isDark ? const Color(0xFF2C2C2E) : Colors.white;
+    final borderColor = isDark ? Colors.white24 : Colors.black12;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: widget.padding,
-          child: Row(
-            children: [
-              Flexible(
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black12),
-                  ),
-                  padding: const EdgeInsets.fromLTRB(16, 0, 0, 0),
-                  child: TextField(
-                    controller: _textController,
-                    focusNode: _focusNode,
-                    onChanged: _onChanged,
-                    style: const TextStyle(fontSize: 18),
-                    decoration: InputDecoration(
-                      icon: _isTyping ? null : const Icon(Icons.search),
-                      hintText: _isTyping ? '' : widget.hintText,
-
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.zero,
-                      hintStyle: const TextStyle(
-                        color: Color.fromRGBO(142, 142, 147, 1),
-                      ),
+        ColoredBox(
+          color: _active ? bgColor : Colors.transparent,
+          child: Padding(
+            padding: widget.padding,
+            child: Row(
+              children: [
+                Flexible(
+                  child: Container(
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: containerColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: borderColor),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        if (!_isTyping)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16, right: 4),
+                            child: Icon(Icons.search, color: isDark ? Colors.white70 : null),
+                          ),
+                        Expanded(
+                          child: TextField(
+                            controller: _textController,
+                            focusNode: _focusNode,
+                            onChanged: _onChanged,
+                            style: TextStyle(fontSize: 18, color: isDark ? Colors.white : null),
+                            decoration: InputDecoration(
+                              hintText: _isTyping ? '' : widget.hintText,
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.fromLTRB(
+                                _isTyping ? 16 : 0,
+                                0, 0, 0,
+                              ),
+                              isCollapsed: true,
+                              hintStyle: const TextStyle(
+                                color: Color.fromRGBO(142, 142, 147, 1),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                child: _active
-                    ? GestureDetector(
-                        onTap: _cancelTapped,
-                        child: const Padding(
-                          padding: EdgeInsets.only(left: 10),
-                          child: Text('Cancel'),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  child: _active
+                      ? GestureDetector(
+                          onTap: _cancelTapped,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(color: isDark ? Colors.white : null),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
           ),
         ),
         Expanded(
           child: IgnorePointer(
             ignoring: !_active,
             child: ColoredBox(
-              color: _active ? Colors.white : Colors.transparent,
+              color: _active ? bgColor : Colors.transparent,
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _results.isNotEmpty
-                      ? ListView.builder(
-                          padding: EdgeInsets.zero,
-                          itemCount: _results.length,
-                          itemBuilder: (context, index) =>
-                              widget.onItemFound(_results[index], index),
+                      ? Theme(
+                          data: Theme.of(context).copyWith(
+                            listTileTheme: ListTileThemeData(
+                              textColor: isDark ? Colors.white : null,
+                              subtitleTextStyle: TextStyle(
+                                color: isDark ? Colors.white60 : null,
+                              ),
+                            ),
+                          ),
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: _results.length,
+                            itemBuilder: (context, index) =>
+                                widget.onItemFound(_results[index], index),
+                          ),
                         )
                       : _active
                           ? Center(child: widget.emptyWidget)

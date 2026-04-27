@@ -610,6 +610,7 @@ class _TransitAppState extends State<TransitApp> {
         debugShowCheckedModeBanner: false,
         home: Scaffold(
           key: _scaffoldKey,
+          resizeToAvoidBottomInset: false,
           body: Stack(children: <Widget>[
             GoogleMap(
               myLocationEnabled: isLocationOnMapEnabled,
