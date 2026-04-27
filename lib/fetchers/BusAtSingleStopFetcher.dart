@@ -70,7 +70,7 @@ class BusAtSingleStopFetcher {
       if (realtimeTripIds.contains(tripId)) continue;
 
       final countdown = ((epochSec - nowSec) / 60).floor();
-      if (countdown < 0 || countdown > 90) continue;
+      if (countdown < 0 || countdown > 1440) continue;
 
       final tripInfo = static_.getTripInfo(tripId);
       if (tripInfo == null) continue;

@@ -51,6 +51,7 @@ class GtfsStaticService {
 
   bool _stopsLoaded = false;
   bool _staticLoaded = false;
+  Future<void>? _loadFuture;
   // Throttle failed download retries within a session (5-minute cooldown).
   DateTime? _lastStaticAttempt;
 
@@ -63,8 +64,12 @@ class GtfsStaticService {
   bool get hasRoutesLoaded => _routes.isNotEmpty;
 
   /// Must be awaited before calling any other method.
-  Future<void> ensureLoaded() async {
-    if (_stopsLoaded && _staticLoaded) return;
+  Future<void> ensureLoaded() {
+    if (_stopsLoaded && _staticLoaded) return Future.value();
+    return _loadFuture ??= _doLoad();
+  }
+
+  Future<void> _doLoad() async {
 
     final cacheDir = await getApplicationCacheDirectory();
     final zipFile = File('${cacheDir.path}/$_cacheFileName');
