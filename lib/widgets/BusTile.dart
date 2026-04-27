@@ -9,7 +9,7 @@ class BusTile extends StatelessWidget {
   final int carouselIndex;
   final bool isDarkMode;
   final void Function(int) onCarouselChanged;
-  final void Function(String pattern, String stopNo) onTap;
+  final void Function(String routeNo, String pattern, String stopNo) onTap;
 
   const BusTile({
     super.key,
@@ -24,78 +24,121 @@ class BusTile extends StatelessWidget {
     final Trip activeTrip = route.Trips[carouselIndex];
     final String routeNo = removeLeadingZeros(route.RouteNo);
     return InkWell(
-      onTap: () => onTap(trip.Pattern ?? '', trip.StopNo ?? ''),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              routeNo,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: routeNo.length < 3 ? 50 : 35,
-                height: 1.0,
-                fontWeight: FontWeight.w700,
-                color: isDarkMode ? Colors.white70 : colorFromHex('#10295D'),
+      onTap: () => onTap(route.RouteNo, trip.Pattern ?? '', trip.StopNo ?? ''),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            SizedBox(
+              width: 70,
+              child: Text(
+                routeNo,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: routeNo.length < 3 ? 50 : 35,
+                  height: 1.0,
+                  fontWeight: FontWeight.w700,
+                  color: isDarkMode ? Colors.white70 : colorFromHex('#10295D'),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(left: 15),
-                  child: Text(
-                    activeTrip.Destination ?? '',
-                    textAlign: TextAlign.left,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      height: 1.0,
-                      color: isDarkMode ? Colors.white70 : colorFromHex('#024D7E'),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(left: 15),
+                    child: Text(
+                      activeTrip.Destination ?? '',
+                      textAlign: TextAlign.left,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        height: 1.0,
+                        color: isDarkMode ? Colors.white70 : colorFromHex('#024D7E'),
+                      ),
                     ),
                   ),
-                ),
-                Container(
-                  margin: const EdgeInsets.only(left: 15),
-                  child: Text(
-                    '${patternToDirection(activeTrip.Pattern ?? '')} at \n${activeTrip.nextStop ?? ''}',
-                    textAlign: TextAlign.left,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.0,
-                      fontWeight: FontWeight.w400,
-                      color: colorFromHex('1bab65'),
+                  Container(
+                    margin: const EdgeInsets.only(left: 15),
+                    child: Text(
+                      '${patternToDirection(activeTrip.Pattern ?? '')} at \n${activeTrip.nextStop ?? ''}',
+                      textAlign: TextAlign.left,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.0,
+                        fontWeight: FontWeight.w400,
+                        color: colorFromHex('1bab65'),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 83,
-            child: Text(
-              '${activeTrip.ExpectedCountdown ?? 0} min',
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize:
-                    (activeTrip.ExpectedCountdown?.toString().length ?? 1) < 3
-                        ? 24
-                        : 20,
-                fontWeight: FontWeight.w700,
-                height: 1.0,
-                color: isDarkMode ? Colors.white70 : colorFromHex('#10295D'),
+                ],
               ),
             ),
-          ),
-        ],
+            SizedBox(
+              width: 65,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: () {
+                  final countdown = activeTrip.ExpectedCountdown ?? 0;
+                  final timeColor = isDarkMode ? Colors.white70 : colorFromHex('#10295D');
+                  if (countdown >= 60) {
+                    final parts = (activeTrip.ExpectedLeaveTime ?? '').split(' ');
+                    final timeStr = parts.isNotEmpty ? parts[0] : '';
+                    final period = parts.length > 1 ? parts[1] : '';
+                    return [
+                      Text(
+                        timeStr,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          height: 1.0,
+                          color: timeColor,
+                        ),
+                      ),
+                      Text(
+                        period,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w300,
+                          color: timeColor.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ];
+                  }
+                  return [
+                    Text(
+                      '$countdown',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: countdown.toString().length < 3 ? 32 : 26,
+                        fontWeight: FontWeight.w700,
+                        height: 1.0,
+                        color: timeColor,
+                      ),
+                    ),
+                    Text(
+                      'minutes',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w300,
+                        color: timeColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ];
+                }(),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

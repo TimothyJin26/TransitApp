@@ -62,14 +62,15 @@ class BusListSheet extends StatelessWidget {
                         itemBuilder: (context, index) {
                           return ListTile(
                             key: Key(routes[index].RouteNo),
+                            contentPadding: EdgeInsets.zero,
                             title: BusTile(
                               route: routes[index],
                               carouselIndex: carouselIndices[index],
                               isDarkMode: isDarkMode,
                               onCarouselChanged: (ci) =>
                                   onCarouselChanged(index, ci),
-                              onTap: (pattern, stopNo) =>
-                                  onBusTap(routes[index].RouteNo, pattern, stopNo),
+                              onTap: (routeNo, pattern, stopNo) =>
+                                  onBusTap(routeNo, pattern, stopNo),
                             ),
                           );
                         },

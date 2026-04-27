@@ -2,7 +2,7 @@ import 'package:app_settings/app_settings.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'models/BothDirectionRouteWithTrips.dart';
-import 'route_tile.dart';
+import 'package:transitapp/widgets/BusTile.dart';
 import 'transit_util.dart';
 import 'util/TransitLiveTimer.dart';
 
@@ -59,12 +59,13 @@ class BusSheet extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(0, 15, 0, 0),
                     controller: scrollController,
                     itemCount: nextBuses.length,
-                    itemBuilder: (context, index) => RouteTile(
+                    itemBuilder: (context, index) => BusTile(
                       route: nextBuses[index],
-                      dotIndex: dotList[index] as int,
-                      darkModeOn: darkModeOn,
-                      onDotChanged: (dot) => onDotChanged(index, dot),
-                      onTripTap: onTripTap,
+                      carouselIndex: dotList[index] as int,
+                      isDarkMode: darkModeOn,
+                      onCarouselChanged: (dot) => onDotChanged(index, dot),
+                      onTap: (routeNo, pattern, stopNo) =>
+                          onTripTap(routeNo, pattern, stopNo),
                     ),
                   ),
                 ),

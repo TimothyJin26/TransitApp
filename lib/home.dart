@@ -10,7 +10,7 @@ import 'dart:ui' as ui;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show rootBundle, SystemUiOverlayStyle;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
@@ -606,7 +606,9 @@ class _TransitAppState extends State<TransitApp> {
   /// Builds the UI
   ///
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: darkModeOn ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        child: MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
           key: _scaffoldKey,
@@ -867,7 +869,8 @@ class _TransitAppState extends State<TransitApp> {
             ),
           ]),
         ),
-      );
+      ),
+    );
 
   void showZoomInIfNeeded() {
     mapController?.getZoomLevel().then((value) {
