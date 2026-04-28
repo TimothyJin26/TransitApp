@@ -1,14 +1,14 @@
 import 'package:app_settings/app_settings.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'models/BothDirectionRouteWithTrips.dart';
+import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
+import 'package:transitapp/util/TransitLiveTimer.dart';
+import 'package:transitapp/util/TransitUtil.dart';
 import 'package:transitapp/widgets/BusTile.dart';
-import 'transit_util.dart';
-import 'util/TransitLiveTimer.dart';
 
 class BusSheet extends StatelessWidget {
   final List<BothDirectionRouteWithTrips> nextBuses;
-  final List dotList;
+  final List<int> dotList;
   final bool darkModeOn;
   final String emptyText;
   final bool isLocationEnabled;
@@ -49,7 +49,7 @@ class BusSheet extends StatelessWidget {
             Container(
               margin: const EdgeInsets.fromLTRB(0.0, 50.0, 0.0, 0.0),
               color: darkModeOn
-                  ? getColorFromHex('1b2336').withAlpha(252)
+                  ? colorFromHex('1b2336').withAlpha(252)
                   : Colors.white.withAlpha(252),
               child: Stack(children: [
                 AnimatedOpacity(
@@ -61,7 +61,7 @@ class BusSheet extends StatelessWidget {
                     itemCount: nextBuses.length,
                     itemBuilder: (context, index) => BusTile(
                       route: nextBuses[index],
-                      carouselIndex: dotList[index] as int,
+                      carouselIndex: dotList[index],
                       isDarkMode: darkModeOn,
                       onCarouselChanged: (dot) => onDotChanged(index, dot),
                       onTap: (routeNo, pattern, stopNo) =>
@@ -97,6 +97,7 @@ class BusSheet extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.fromLTRB(35, 10, 30, 0),
                             child: RichText(
+                              textAlign: TextAlign.center,
                               text: TextSpan(
                                 recognizer: TapGestureRecognizer()
                                   ..onTap = () => AppSettings.openAppSettings(
@@ -120,38 +121,38 @@ class BusSheet extends StatelessWidget {
                 ),
               ]),
             ),
+            // Positioned(
+            //   left: 7.0,
+            //   top: -7.0,
+            //   child: SizedBox(
+            //     height: 50,
+            //     width: 50,
+            //     child: FittedBox(
+            //       child: FloatingActionButton(
+            //         heroTag: 'refreshBtn',
+            //         shape: const CircleBorder(),
+            //         onPressed: onRefresh,
+            //         backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
+            //         child: isLoading
+            //             ? const SizedBox(
+            //                 height: 20,
+            //                 width: 20,
+            //                 child: CircularProgressIndicator(
+            //                   strokeWidth: 2.5,
+            //                   color: Colors.black54,
+            //                 ),
+            //               )
+            //             : const Icon(
+            //                 Icons.refresh,
+            //                 size: 24,
+            //                 color: Color.fromRGBO(0, 0, 0, 1),
+            //               ),
+            //       ),
+            //     ),
+            //   ),
+            // ),
             Positioned(
               left: 7.0,
-              top: -7.0,
-              child: SizedBox(
-                height: 50,
-                width: 50,
-                child: FittedBox(
-                  child: FloatingActionButton(
-                    heroTag: 'refreshBtn',
-                    shape: const CircleBorder(),
-                    onPressed: onRefresh,
-                    backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.black54,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.refresh,
-                            size: 24,
-                            color: Color.fromRGBO(0, 0, 0, 1),
-                          ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 65.0,
               top: 17.0,
               child: TransitLiveTimer(isLoading, timeDifference),
             ),

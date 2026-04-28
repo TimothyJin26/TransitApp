@@ -23,8 +23,12 @@ class GtfsUtil {
 
   /// Strip TransLink's leading route-number prefix from a trip headsign.
   /// e.g. "014 UBC Exchange" → "UBC Exchange"
-  static String stripHeadsignPrefix(String headsign) =>
-      headsign.replaceFirst(RegExp(r'^\d+\s+'), '');
+  /// For express routes with "/to ": "R4 41st Ave/to Downtown" → "Downtown"
+  static String stripHeadsignPrefix(String headsign) {
+    final toIdx = headsign.toLowerCase().indexOf('/to ');
+    if (toIdx != -1) return headsign.substring(toIdx + 4).trim();
+    return headsign.replaceFirst(RegExp(r'^\w+\s+'), '');
+  }
 
   /// Build the nextStop display string from a stop's street fields.
   static String nextStopLabel(

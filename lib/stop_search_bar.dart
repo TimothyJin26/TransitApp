@@ -193,12 +193,14 @@ class StopSearchBarState extends State<StopSearchBar> {
                   : _results.isNotEmpty
                       ? Theme(
                           data: Theme.of(context).copyWith(
-                            listTileTheme: ListTileThemeData(
-                              textColor: isDark ? Colors.white : null,
-                              subtitleTextStyle: TextStyle(
-                                color: isDark ? Colors.white60 : null,
-                              ),
-                            ),
+                            listTileTheme: isDark
+                                ? const ListTileThemeData(
+                                    textColor: Colors.white,
+                                    subtitleTextStyle: TextStyle(
+                                      color: Colors.white60,
+                                    ),
+                                  )
+                                : null,
                           ),
                           child: ListView.builder(
                             padding: EdgeInsets.zero,

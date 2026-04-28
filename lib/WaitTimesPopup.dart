@@ -134,7 +134,7 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
                                         ),
                                         Expanded(
                                           child: Text(
-                                            'TO ${trip.Destination ?? ''}',
+                                            '${trip.Destination ?? ''}',
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               color: colorFromHex('#0d2036'),

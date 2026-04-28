@@ -69,12 +69,12 @@ class _TransitAppState extends State<TransitApp> {
   var count = 0;
   var scrollsheetText = 'Searching For Buses...';
   var isLocationEnabled = true;
-  var scrollSheetDotList = [];
+  List<int> scrollSheetDotList = [];
   var tappedIntoStop = false;
   Stop? _tappedStop;
   Position? userLocation;
   List<BothDirectionRouteWithTrips>? nextBusesCopy;
-  List? scrollSheetDotListCopy;
+  List<int>? scrollSheetDotListCopy;
   var selectedRouteNo;
   var selectedPattern;
   Marker? selectedStop;
@@ -101,6 +101,10 @@ class _TransitAppState extends State<TransitApp> {
   Future<Position> getLocation() async {
     if (userLocation != null) {
       return userLocation!;
+    }
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
     }
     return Geolocator.getCurrentPosition();
   }
@@ -306,8 +310,11 @@ class _TransitAppState extends State<TransitApp> {
         position: LatLng(
             (bus.Latitude ?? 0) - 0.00005, bus.Longitude ?? 0),
         infoWindow: InfoWindow(
-          title:
-              '${patternHelper(bus.Pattern ?? '')} to ${bus.Destination ?? ''}',
+          title: () {
+            final dest = bus.Destination ?? '';
+            final toIdx = dest.toLowerCase().indexOf('/to ');
+            return toIdx != -1 ? dest.substring(toIdx + 4).trim() : dest;
+          }(),
         ),
         icon: descriptors[i],
       );
@@ -355,8 +362,8 @@ class _TransitAppState extends State<TransitApp> {
       for (final Stop stop in stops)
         MarkerHelper.createCustomMarkerBitmapNoText(
           image,
-          highlightedStopNo == stop.StopNo ? 80 : 50,
-          highlightedStopNo == stop.StopNo ? 80 : 50,
+          highlightedStopNo == stop.StopNo ? 60 : 38,
+          highlightedStopNo == stop.StopNo ? 60 : 38,
         ),
     ];
 
@@ -372,7 +379,7 @@ class _TransitAppState extends State<TransitApp> {
               nextBusesCopy =
                   List<BothDirectionRouteWithTrips>.from(nextBuses);
               scrollSheetDotListCopy =
-                  List<dynamic>.from(scrollSheetDotList);
+                  List<int>.from(scrollSheetDotList);
             }
             tappedIntoStop = true;
             _tappedStop = stop;
@@ -578,9 +585,11 @@ class _TransitAppState extends State<TransitApp> {
     ));
   }
 
-  void _currentLocation() {
-    if (mapController == null || userLocation == null) return;
+  Future<void> _currentLocation() async {
+    if (mapController == null) return;
     try {
+      final position = await Geolocator.getCurrentPosition();
+      userLocation = position;
       setState(() {
         isLocationEnabled = true;
         isLocationOnMapEnabled = true;
@@ -589,7 +598,7 @@ class _TransitAppState extends State<TransitApp> {
       mapController!.animateCamera(CameraUpdate.newCameraPosition(
         CameraPosition(
           bearing: 0,
-          target: LatLng(userLocation!.latitude, userLocation!.longitude),
+          target: LatLng(position.latitude, position.longitude),
           zoom: 16.0,
         ),
       ));
@@ -802,7 +811,7 @@ class _TransitAppState extends State<TransitApp> {
                               List<BothDirectionRouteWithTrips>.from(
                                   nextBuses);
                           scrollSheetDotListCopy =
-                              List<dynamic>.from(scrollSheetDotList);
+                              List<int>.from(scrollSheetDotList);
                         }
                         tappedIntoStop = true;
                         _tappedStop = post;
@@ -904,7 +913,7 @@ class _TransitAppState extends State<TransitApp> {
       updateBuses();
     }
     load('images/StopIcon.png').then((image) {
-      MarkerHelper.createCustomMarkerBitmapNoText(image, 75, 75)
+      MarkerHelper.createCustomMarkerBitmapNoText(image, 56, 56)
           .then((bitmapDescriptor) {
         double? latitude;
         double? longitude;
