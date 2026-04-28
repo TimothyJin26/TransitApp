@@ -184,7 +184,7 @@ class _TransitAppState extends State<TransitApp> {
     timer = Timer.periodic(
         const Duration(seconds: 30), (Timer t) => timerIfSelectedHelper());
     timerShort = Timer.periodic(
-        const Duration(seconds: 1), (Timer t) => timerIfSelectedHelperShort());
+        const Duration(milliseconds: 200), (Timer t) => timerIfSelectedHelperShort());
 
     WidgetsBinding.instance.addObserver(LifecycleEventHandler(
       resumeCallBack: () async {
@@ -193,7 +193,7 @@ class _TransitAppState extends State<TransitApp> {
           timerIfSelectedHelperShort();
           timer = Timer.periodic(const Duration(seconds: 30),
               (Timer t) => timerIfSelectedHelper());
-          timerShort = Timer.periodic(const Duration(seconds: 2),
+          timerShort = Timer.periodic(const Duration(milliseconds: 200),
               (Timer t) => timerIfSelectedHelperShort());
 
           darkModeOn = SunsetHelper.isDark();
@@ -434,10 +434,9 @@ class _TransitAppState extends State<TransitApp> {
       return;
     }
 
-    final List<Stop> stops = listOfStops;
     final List<BothDirectionRouteWithTrips> buses =
         await BusAtStopFetcher().busFetcher(
-      stops,
+      listOfStops,
       locationData.latitude,
       locationData.longitude,
     );

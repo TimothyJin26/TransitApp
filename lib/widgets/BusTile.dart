@@ -1,3 +1,4 @@
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:transitapp/models/BothDirectionRouteWithTrips.dart';
 import 'package:transitapp/models/Trip.dart';
@@ -150,8 +151,10 @@ class _BusTileState extends State<BusTile> with SingleTickerProviderStateMixin {
     return InkWell(
       onTap: () =>
           widget.onTap(widget.route.RouteNo, trip.Pattern ?? '', trip.StopNo ?? ''),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: SizedBox(
+        height: 76,
+        child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -168,14 +171,16 @@ class _BusTileState extends State<BusTile> with SingleTickerProviderStateMixin {
                       color: timeColor)),
             ),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(left: 15),
-                    child: Text(trip.Destination ?? '',
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AutoSizeText(trip.Destination ?? '',
                         textAlign: TextAlign.left,
+                        maxLines: 2,
+                        minFontSize: 10,
                         style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -183,23 +188,23 @@ class _BusTileState extends State<BusTile> with SingleTickerProviderStateMixin {
                             color: widget.isDarkMode
                                 ? Colors.white70
                                 : colorFromHex('#024D7E'))),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(left: 15),
-                    child: Text(trip.nextStop ?? '',
+                    AutoSizeText(trip.nextStop ?? '',
                         textAlign: TextAlign.left,
+                        maxLines: 2,
+                        minFontSize: 10,
                         style: TextStyle(
                             fontSize: 15,
                             height: 1.2,
                             fontWeight: FontWeight.w400,
                             color: colorFromHex('1bab65'))),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
             SizedBox(width: 65, child: countdownWidget),
           ],
         ),
+      ),
       ),
     );
   }
