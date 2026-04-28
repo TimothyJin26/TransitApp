@@ -47,6 +47,12 @@ class GtfsRealtimeService {
     return _tripUpdateIndex![stopId] ?? [];
   }
 
+  /// Returns trip IDs of all trips currently departing from [stopId].
+  Future<Set<String>> getTripIdsForStop(String stopId) async {
+    final entries = await getDeparturesForStop(stopId);
+    return entries.map((e) => e.tripUpdate.tripId).toSet();
+  }
+
   Future<List<GtfsVehiclePosition>> getVehiclePositions() async {
     if (_isFresh(_vehiclePositionsAt) && _vehiclePositions != null) return _vehiclePositions!;
     try {

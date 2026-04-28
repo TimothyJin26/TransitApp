@@ -56,6 +56,7 @@ class _TransitAppState extends State<TransitApp> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<PolylineId, Polyline> _mapPolylines = {};
   Set<Marker> _routeStopMarkers = {};
+  Set<Marker> _stopViewBusMarkers = {};
   Timer? timer;
   Timer? timerShort;
   List<bool> isSelected = [true, false];
@@ -291,48 +292,7 @@ class _TransitAppState extends State<TransitApp> {
     for (int i = 0; i < buses.length; i++) {
       final Bus bus = buses[i];
       final marker = Marker(
-        onTap: () {
-          setState(() {
-            _mapPolylines.clear();
-            _routeStopMarkers = {};
-          });
-          final routeNo = bus.RouteNo ?? '';
-          final color = GtfsStaticService().getRouteColor(routeNo, isDark: darkModeOn);
-          final tripId = bus.TripId?.toString();
-          final tripShape = tripId != null
-              ? GtfsStaticService().getShapeForTrip(tripId)
-              : null;
-          if (tripShape != null) {
-            addLines(routeNo, tripShape, 0, color);
-          } else {
-            final shapes = GtfsStaticService().getShapesForRoute(routeNo);
-            for (int i = 0; i < shapes.length; i++) {
-              addLines(routeNo, shapes[i], i, color);
-            }
-          }
-          if (tripId != null) {
-            final stops = GtfsStaticService().getStopsForTrip(tripId);
-            if (stops.isNotEmpty) {
-              MarkerHelper.createDotMarker(size: 10, pixelRatio: _pixelRatio)
-                  .then((dotIcon) {
-                final markers = <Marker>{};
-                for (final stop in stops) {
-                  if (stop.Latitude == null || stop.Longitude == null) continue;
-                  final snapped = tripShape != null
-                      ? _snapToPolyline(LatLng(stop.Latitude!, stop.Longitude!), tripShape)
-                      : LatLng(stop.Latitude!, stop.Longitude!);
-                  markers.add(Marker(
-                    markerId: MarkerId('routestop_${stop.StopNo}'),
-                    position: snapped,
-                    icon: dotIcon,
-                    anchor: const Offset(0.5, 0.5),
-                  ));
-                }
-                setState(() { _routeStopMarkers = markers; });
-              });
-            }
-          }
-        },
+        onTap: () => _onBusMarkerTap(bus.RouteNo ?? '', bus.TripId?.toString()),
         markerId: MarkerId(
             '${bus.VehicleNo}!${bus.RouteNo}!${bus.Pattern}'),
         position: LatLng(
@@ -349,6 +309,44 @@ class _TransitAppState extends State<TransitApp> {
       l.add(marker);
     }
     return l;
+  }
+
+  void _onBusMarkerTap(String routeNo, String? tripId) {
+    setState(() {
+      _mapPolylines.clear();
+      _routeStopMarkers = {};
+    });
+    final color = GtfsStaticService().getRouteColor(routeNo, isDark: darkModeOn);
+    final tripShape = tripId != null ? GtfsStaticService().getShapeForTrip(tripId) : null;
+    if (tripShape != null) {
+      addLines(routeNo, tripShape, 0, color);
+    } else {
+      final shapes = GtfsStaticService().getShapesForRoute(routeNo);
+      for (int i = 0; i < shapes.length; i++) {
+        addLines(routeNo, shapes[i], i, color);
+      }
+    }
+    if (tripId != null) {
+      final stops = GtfsStaticService().getStopsForTrip(tripId);
+      if (stops.isNotEmpty) {
+        MarkerHelper.createDotMarker(size: 10, pixelRatio: _pixelRatio).then((dotIcon) {
+          final markers = <Marker>{};
+          for (final stop in stops) {
+            if (stop.Latitude == null || stop.Longitude == null) continue;
+            final snapped = tripShape != null
+                ? _snapToPolyline(LatLng(stop.Latitude!, stop.Longitude!), tripShape)
+                : LatLng(stop.Latitude!, stop.Longitude!);
+            markers.add(Marker(
+              markerId: MarkerId('routestop_${stop.StopNo}'),
+              position: snapped,
+              icon: dotIcon,
+              anchor: const Offset(0.5, 0.5),
+            ));
+          }
+          setState(() { _routeStopMarkers = markers; });
+        });
+      }
+    }
   }
 
   /// Returns the closest point on [polyline] to [point].
@@ -445,6 +443,7 @@ class _TransitAppState extends State<TransitApp> {
               renderListOfNextBuses(value);
             });
           });
+          if (stop.StopNo != null) _loadStopViewBusMarkers(stop.StopNo!);
         },
         markerId: MarkerId(stop.StopNo.toString()),
         position: LatLng(stop.Latitude ?? 0, stop.Longitude ?? 0),
@@ -469,6 +468,48 @@ class _TransitAppState extends State<TransitApp> {
       renderListOfNextBuses(value);
       setState(() { isLoading = false; });
     });
+  }
+
+
+  Future<void> _loadStopViewBusMarkers(int stopCode) async {
+    await GtfsStaticService().ensureLoaded();
+    final internalStopId = GtfsStaticService().getStopId(stopCode);
+    if (internalStopId == null) return;
+
+    final tripIds = await GtfsRealtimeService().getTripIdsForStop(internalStopId);
+    if (tripIds.isEmpty) return;
+
+    final allPositions = await GtfsRealtimeService().getVehiclePositions();
+    final matching = allPositions.where((v) => tripIds.contains(v.tripId)).toList();
+
+    if (matching.isEmpty) return;
+
+    final image = await load('images/bus-icon-outline.png');
+    final static_ = GtfsStaticService();
+    final bitmapFutures = <Future<BitmapDescriptor>>[];
+    for (final v in matching) {
+      String routeShort = static_.getRouteShortName(v.routeId) ?? '';
+      if (routeShort.isEmpty && v.routeId.isNotEmpty) {
+        routeShort = v.routeId;
+      }
+      routeShort = removeZeroes(routeShort);
+      bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(
+        routeShort, 0, image, pixelRatio: _pixelRatio));
+    }
+    final descriptors = await Future.wait(bitmapFutures);
+
+    final markers = <Marker>{};
+    for (int i = 0; i < matching.length; i++) {
+      final v = matching[i];
+      final routeNo = removeZeroes(static_.getRouteShortName(v.routeId) ?? v.routeId);
+      markers.add(Marker(
+        markerId: MarkerId('stopview_${v.vehicleId}'),
+        position: LatLng(v.latitude - 0.00005, v.longitude),
+        icon: descriptors[i],
+        onTap: () => _onBusMarkerTap(routeNo, v.tripId),
+      ));
+    }
+    if (mounted) setState(() { _stopViewBusMarkers = markers; });
   }
 
   void updateNextBusesForAllNearbyStops() async {
@@ -698,6 +739,9 @@ class _TransitAppState extends State<TransitApp> {
               polylines: Set<Polyline>.of(_mapPolylines.values),
               markers: _markers.values
                   .where((marker) {
+                    if (tappedIntoStop && isSelected[1]) {
+                      return marker.markerId.value == _tappedStop?.StopNo.toString();
+                    }
                     if (selectedRouteNo == null || selectedPattern == null) {
                       return true;
                     }
@@ -709,7 +753,8 @@ class _TransitAppState extends State<TransitApp> {
                   })
                   .toSet()
                   .union(Set.from(selectedStop == null ? [] : [selectedStop]))
-                  .union(_routeStopMarkers),
+                  .union(_routeStopMarkers)
+                  .union(_stopViewBusMarkers),
               onTap: (LatLng a) {
                 tappedIntoStop = false;
                 _searchBarController.clear();
@@ -721,22 +766,31 @@ class _TransitAppState extends State<TransitApp> {
                   }
                   _mapPolylines.clear();
                   _routeStopMarkers = {};
+                  _stopViewBusMarkers = {};
                 });
+                if (isSelected[0] == false) {
+                  showZoomInIfNeeded();
+                }
               },
               onCameraIdle: () {
                 count--;
                 if (count <= 0) {
-                  tappedIntoStop = false;
-                  highlightedStopNo = null;
-                  setState(() {
-                    if (nextBusesCopy != null &&
-                        scrollSheetDotListCopy != null) {
-                      nextBuses = nextBusesCopy!;
-                      scrollSheetDotList = scrollSheetDotListCopy!;
-                    }
-                  });
-                  if (isSelected[0] == false) {
+                  if (!tappedIntoStop) {
+                    highlightedStopNo = null;
+                    setState(() {
+                      if (nextBusesCopy != null &&
+                          scrollSheetDotListCopy != null) {
+                        nextBuses = nextBusesCopy!;
+                        scrollSheetDotList = scrollSheetDotListCopy!;
+                      }
+                    });
+                  }
+                  if (isSelected[0] == false && !tappedIntoStop) {
                     showZoomInIfNeeded();
+                  }
+                  if (tappedIntoStop && _tappedStop?.StopNo != null) {
+                    mapController?.showMarkerInfoWindow(
+                        MarkerId(_tappedStop!.StopNo.toString()));
                   }
                 }
               },
@@ -792,6 +846,8 @@ class _TransitAppState extends State<TransitApp> {
                         }
                         setState(() {
                           isSelected = switchingToStops ? [false, true] : [true, false];
+                          tappedIntoStop = false;
+                          _stopViewBusMarkers = {};
                         });
                       },
                       backgroundColor: darkModeOn
@@ -1001,5 +1057,6 @@ class _TransitAppState extends State<TransitApp> {
     });
   }
 }
+
 
 
