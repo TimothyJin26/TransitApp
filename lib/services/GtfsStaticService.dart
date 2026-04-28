@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:archive/archive.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:transitapp/models/Stop.dart';
@@ -15,7 +16,8 @@ class _GtfsTrip {
   final String headsign;
   final int directionId;
   final String serviceId;
-  _GtfsTrip(this.routeId, this.headsign, this.directionId, this.serviceId);
+  final String shapeId;
+  _GtfsTrip(this.routeId, this.headsign, this.directionId, this.serviceId, this.shapeId);
 }
 
 class _ScheduledDep {
@@ -39,8 +41,14 @@ class GtfsStaticService {
   final Map<String, int> _stopIdToCode = {};
   // All stops with coordinates (for proximity search)
   final List<Stop> _allStops = [];
-  // route_id → route_short_name (e.g. "49", "99 B-Line")
+  // route_id → route_short_name (e.g. "049", "099 B-Line")
   final Map<String, String> _routes = {};
+  // route_short_name (stripped of leading zeros) → route_id
+  final Map<String, String> _routeShortToId = {};
+  // route_id → route_color hex (e.g. "d04110"), empty if not set
+  final Map<String, String> _routeColors = {};
+  // shape_id → ordered LatLng points
+  final Map<String, List<LatLng>> _shapes = {};
   // trip_id → trip info
   final Map<String, _GtfsTrip> _trips = {};
   // service_ids running today (from calendar.txt + calendar_dates.txt)
@@ -48,6 +56,10 @@ class GtfsStaticService {
   bool _calendarLoaded = false;
   // stop_id → scheduled departures for today's active trips
   final Map<String, List<_ScheduledDep>> _stopTimes = {};
+  // trip_id → stop_ids in order
+  final Map<String, List<String>> _tripStops = {};
+  // stop_id → Stop (for O(1) lookup)
+  final Map<String, Stop> _stopById = {};
 
   bool _stopsLoaded = false;
   bool _staticLoaded = false;
@@ -145,6 +157,57 @@ class GtfsStaticService {
   String? getRouteShortName(String routeId) => _routes[routeId];
   _GtfsTrip? getTripInfo(String tripId) => _trips[tripId];
 
+  /// Returns the route color for [routeNo], defaulting to a blue toned to [isDark].
+  Color getRouteColor(String routeNo, {bool isDark = false}) {
+    final routeId = _routeShortToId[_stripZeros(routeNo)];
+    final hex = routeId != null ? _routeColors[routeId] : null;
+    if (hex != null && hex.length == 6) {
+      final r = int.tryParse(hex.substring(0, 2), radix: 16);
+      final g = int.tryParse(hex.substring(2, 4), radix: 16);
+      final b = int.tryParse(hex.substring(4, 6), radix: 16);
+      if (r != null && g != null && b != null) {
+        return Color.fromARGB(255, r, g, b);
+      }
+    }
+    return isDark ? const Color.fromARGB(255, 40, 92, 176) : const Color(0xFF1b2336);
+  }
+
+  /// Returns the ordered stops for a specific [tripId].
+  List<Stop> getStopsForTrip(String tripId) {
+    final stopIds = _tripStops[tripId];
+    if (stopIds == null) return [];
+    return stopIds.map((id) => _stopById[id]).whereType<Stop>().toList();
+  }
+
+  /// Returns the shape for a specific [tripId], or null if not found.
+  List<LatLng>? getShapeForTrip(String tripId) {
+    final shapeId = _trips[tripId]?.shapeId;
+    if (shapeId == null || shapeId.isEmpty) return null;
+    return _shapes[shapeId];
+  }
+
+  /// Returns all distinct route shapes for [routeNo] (e.g. "049" or "099").
+  /// Matches against GTFS route_short_name with leading zeros stripped.
+  List<List<LatLng>> getShapesForRoute(String routeNo) {
+    final routeId = _routeShortToId[_stripZeros(routeNo)];
+    if (routeId == null) return [];
+    final seen = <String>{};
+    final result = <List<LatLng>>[];
+    for (final trip in _trips.values) {
+      if (trip.routeId != routeId) continue;
+      if (trip.shapeId.isEmpty || !seen.add(trip.shapeId)) continue;
+      final pts = _shapes[trip.shapeId];
+      if (pts != null && pts.isNotEmpty) result.add(pts);
+    }
+    return result;
+  }
+
+  static String _stripZeros(String s) {
+    final trimmed = s.trim();
+    final match = RegExp(r'^0+(\d.*)$').firstMatch(trimmed);
+    return match != null ? match.group(1)! : trimmed;
+  }
+
   /// Scheduled departures from stop_times.txt for [stopId] in the next 90 min.
   /// Returns (tripId, epochSec) pairs sorted by departure time.
   List<(String, int)> getScheduledDepartures(String stopId) {
@@ -206,6 +269,7 @@ class GtfsStaticService {
       if (name == 'stops.txt') _parseStops(content);
       if (name == 'routes.txt') _parseRoutes(content);
       if (name == 'trips.txt') _parseTrips(content);
+      if (name == 'shapes.txt') _parseShapes(content);
       if (name == 'calendar.txt') _parseCalendar(content);
       if (name == 'calendar_dates.txt') _parseCalendarDates(content);
     }
@@ -262,7 +326,7 @@ class GtfsStaticService {
         atStreet = '';
       }
 
-      _allStops.add(Stop(
+      final stop = Stop(
         StopNo: stopCode,
         Name: name,
         OnStreet: onStreet,
@@ -272,7 +336,9 @@ class GtfsStaticService {
         WheelchairAccess: wchCol >= 0 && wchCol < row.length
             ? int.tryParse(row[wchCol].trim())
             : null,
-      ));
+      );
+      _allStops.add(stop);
+      _stopById[stopId] = stop;
     }
   }
 
@@ -282,6 +348,7 @@ class GtfsStaticService {
     final header = _csvRow(lines[0]);
     final idCol = header.indexOf('route_id');
     final shortCol = header.indexOf('route_short_name');
+    final colorCol = header.indexOf('route_color');
     if (idCol < 0 || shortCol < 0) return;
 
     for (int i = 1; i < lines.length; i++) {
@@ -289,7 +356,14 @@ class GtfsStaticService {
       if (row.length <= max(idCol, shortCol)) continue;
       final id = row[idCol].trim();
       final name = row[shortCol].trim();
-      if (id.isNotEmpty && name.isNotEmpty) _routes[id] = name;
+      if (id.isNotEmpty && name.isNotEmpty) {
+        _routes[id] = name;
+        _routeShortToId[_stripZeros(name)] = id;
+        if (colorCol >= 0 && colorCol < row.length) {
+          final color = row[colorCol].trim();
+          if (color.isNotEmpty) _routeColors[id] = color;
+        }
+      }
     }
   }
 
@@ -302,6 +376,7 @@ class GtfsStaticService {
     final headsignCol = header.indexOf('trip_headsign');
     final dirCol = header.indexOf('direction_id');
     final serviceIdCol = header.indexOf('service_id');
+    final shapeIdCol = header.indexOf('shape_id');
     if (tripIdCol < 0) return;
 
     for (int i = 1; i < lines.length; i++) {
@@ -321,8 +396,45 @@ class GtfsStaticService {
       final serviceId = serviceIdCol >= 0 && serviceIdCol < row.length
           ? row[serviceIdCol].trim()
           : '';
-      _trips[tripId] = _GtfsTrip(routeId, headsign, dirId, serviceId);
+      final shapeId = shapeIdCol >= 0 && shapeIdCol < row.length
+          ? row[shapeIdCol].trim()
+          : '';
+      _trips[tripId] = _GtfsTrip(routeId, headsign, dirId, serviceId, shapeId);
     }
+  }
+
+  void _parseShapes(String csv) {
+    final lines = csv.split('\n');
+    if (lines.isEmpty) return;
+    final header = lines[0].split(',');
+    final idCol = header.indexOf('shape_id');
+    final latCol = header.indexOf('shape_pt_lat');
+    final lonCol = header.indexOf('shape_pt_lon');
+    final seqCol = header.indexOf('shape_pt_sequence');
+    if (idCol < 0 || latCol < 0 || lonCol < 0) return;
+
+    // Accumulate points per shape as (sequence, LatLng).
+    final Map<String, List<(int, LatLng)>> raw = {};
+    for (int i = 1; i < lines.length; i++) {
+      final line = lines[i];
+      if (line.isEmpty) continue;
+      final row = line.split(',');
+      if (row.length <= max(idCol, max(latCol, lonCol))) continue;
+      final shapeId = row[idCol].trim();
+      final lat = double.tryParse(row[latCol].trim());
+      final lon = double.tryParse(row[lonCol].trim());
+      if (shapeId.isEmpty || lat == null || lon == null) continue;
+      final seq = seqCol >= 0 && seqCol < row.length
+          ? (int.tryParse(row[seqCol].trim()) ?? 0)
+          : 0;
+      raw.putIfAbsent(shapeId, () => []).add((seq, LatLng(lat, lon)));
+    }
+
+    for (final entry in raw.entries) {
+      final pts = entry.value..sort((a, b) => a.$1.compareTo(b.$1));
+      _shapes[entry.key] = pts.map((p) => p.$2).toList();
+    }
+    debugPrint('GtfsStaticService: ${_shapes.length} shapes loaded');
   }
 
   void _parseCalendar(String csv) {
@@ -396,9 +508,13 @@ class GtfsStaticService {
     final tripIdCol = headerParts.indexOf('trip_id');
     final depCol = headerParts.indexOf('departure_time');
     final stopIdCol = headerParts.indexOf('stop_id');
+    final seqCol = headerParts.indexOf('stop_sequence');
     if (tripIdCol < 0 || depCol < 0 || stopIdCol < 0) return;
 
     final needCols = max(tripIdCol, max(depCol, stopIdCol));
+
+    // temp buffer for building ordered stop lists: trip_id → [(seq, stopId)]
+    final Map<String, List<(int, String)>> tripStopsTemp = {};
 
     for (int i = 1; i < lines.length; i++) {
       final line = lines[i];
@@ -417,14 +533,26 @@ class GtfsStaticService {
         if (!_trips.containsKey(tripId)) continue;
       }
 
-      final depStr = row[depCol].trim();
       final stopId = row[stopIdCol].trim();
-      if (depStr.isEmpty || stopId.isEmpty) continue;
+      if (stopId.isEmpty) continue;
 
-      final depSec = _parseTimeSec(depStr);
-      if (depSec < 0) continue;
+      final depStr = row[depCol].trim();
+      if (depStr.isNotEmpty) {
+        final depSec = _parseTimeSec(depStr);
+        if (depSec >= 0) {
+          _stopTimes.putIfAbsent(stopId, () => []).add(_ScheduledDep(tripId, depSec));
+        }
+      }
 
-      _stopTimes.putIfAbsent(stopId, () => []).add(_ScheduledDep(tripId, depSec));
+      final seq = seqCol >= 0 && seqCol < row.length
+          ? (int.tryParse(row[seqCol].trim()) ?? 0)
+          : 0;
+      tripStopsTemp.putIfAbsent(tripId, () => []).add((seq, stopId));
+    }
+
+    for (final entry in tripStopsTemp.entries) {
+      entry.value.sort((a, b) => a.$1.compareTo(b.$1));
+      _tripStops[entry.key] = entry.value.map((e) => e.$2).toList();
     }
   }
 

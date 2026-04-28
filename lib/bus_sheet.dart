@@ -154,7 +154,7 @@ class BusSheet extends StatelessWidget {
             Positioned(
               left: 7.0,
               top: 17.0,
-              child: TransitLiveTimer(isLoading, timeDifference),
+              child: TransitLiveTimer(isLoading, timeDifference, isDark: darkModeOn),
             ),
             Positioned(
               right: 7.0,
@@ -166,12 +166,17 @@ class BusSheet extends StatelessWidget {
                   child: FloatingActionButton(
                     heroTag: 'centerLocation',
                     shape: const CircleBorder(),
+                    elevation: 1,
                     onPressed: onCenterLocation,
-                    backgroundColor: const Color.fromRGBO(255, 255, 255, 0.95),
-                    child: const Icon(
-                      Icons.near_me_outlined,
+                    backgroundColor: darkModeOn
+                        ? const Color.fromRGBO(50, 52, 58, 1)
+                        : const Color.fromRGBO(255, 255, 255, 0.95),
+                    child: Icon(
+                      Icons.near_me,
                       size: 24,
-                      color: Color.fromRGBO(0, 0, 0, 1),
+                      color: darkModeOn
+                          ? const Color.fromRGBO(138, 180, 247, 1)
+                          : const Color.fromRGBO(25, 115, 232, 1),
                     ),
                   ),
                 ),

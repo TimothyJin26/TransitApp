@@ -112,8 +112,7 @@ class StopSearchBarState extends State<StopSearchBar> {
   Widget build(BuildContext context) {
     final isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
     final bgColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final containerColor = isDark ? const Color(0xFF2C2C2E) : Colors.white;
-    final borderColor = isDark ? Colors.white24 : Colors.black12;
+    final containerColor = isDark ? const Color.fromRGBO(50, 52, 58, 1) : Colors.white;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,8 +128,14 @@ class StopSearchBarState extends State<StopSearchBar> {
                     height: 52,
                     decoration: BoxDecoration(
                       color: containerColor,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: borderColor),
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: _active ? [] : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -146,6 +151,7 @@ class StopSearchBarState extends State<StopSearchBar> {
                             focusNode: _focusNode,
                             onChanged: _onChanged,
                             style: TextStyle(fontSize: 18, color: isDark ? Colors.white : null),
+                            cursorColor: Theme.of(context).colorScheme.primary,
                             decoration: InputDecoration(
                               hintText: _isTyping ? '' : widget.hintText,
                               border: InputBorder.none,
@@ -210,7 +216,15 @@ class StopSearchBarState extends State<StopSearchBar> {
                           ),
                         )
                       : _active
-                          ? Center(child: widget.emptyWidget)
+                          ? Align(
+                              alignment: const Alignment(0, -0.25),
+                              child: DefaultTextStyle.merge(
+                                style: TextStyle(
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                child: widget.emptyWidget,
+                              ),
+                            )
                           : const SizedBox.shrink(),
             ),
           ),

@@ -27,7 +27,7 @@ import 'bus_sheet.dart';
 import 'stop_search_bar.dart';
 import 'transit_util.dart';
 import 'fetchers/BusAtStopFetcher.dart';
-import 'fetchers/RouteMapCoordinateHelper.dart';
+import 'package:transitapp/services/GtfsStaticService.dart';
 import 'fetchers/StopFetcher.dart';
 import 'models/BothDirectionRouteWithTrips.dart';
 import 'models/Stop.dart';
@@ -51,9 +51,11 @@ class _TransitAppState extends State<TransitApp> {
       '[  {    "elementType": "geometry",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#242f3e"      }    ]  },  {    "featureType": "administrative.locality",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "poi",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "poi.park",    "stylers": [      {        "visibility": "on"      }    ]  },  {    "featureType": "poi.park",    "elementType": "geometry",    "stylers": [      {        "color": "#263c3f"      }    ]  },  {    "featureType": "poi.park",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#6b9a76"      }    ]  },  {    "featureType": "road",    "elementType": "geometry",    "stylers": [      {        "color": "#38414e"      }    ]  },  {    "featureType": "road",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#212a37"      },      {        "visibility": "simplified"      },      {        "weight": 2      }    ]  },  {    "featureType": "road",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#9ca5b3"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry",    "stylers": [      {        "color": "#746855"      }    ]  },  {    "featureType": "road.highway",    "elementType": "geometry.stroke",    "stylers": [      {        "color": "#1f2835"      }    ]  },  {    "featureType": "road.highway",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#f3d19c"      }    ]  },  {    "featureType": "transit",    "stylers": [      {        "visibility": "off"      }    ]  },  {    "featureType": "transit",    "elementType": "geometry",    "stylers": [      {        "color": "#2f3948"      }    ]  },  {    "featureType": "transit.station",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#d59563"      }    ]  },  {    "featureType": "water",    "elementType": "geometry",    "stylers": [      {        "color": "#17263c"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.fill",    "stylers": [      {        "color": "#515c6d"      }    ]  },  {    "featureType": "water",    "elementType": "labels.text.stroke",    "stylers": [      {        "color": "#17263c"      }    ]  }]';
 
   bool darkModeOn = false;
+  double _pixelRatio = 1.0;
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   Map<PolylineId, Polyline> _mapPolylines = {};
+  Set<Marker> _routeStopMarkers = {};
   Timer? timer;
   Timer? timerShort;
   List<bool> isSelected = [true, false];
@@ -280,7 +282,7 @@ class _TransitAppState extends State<TransitApp> {
 
     final List<Future<BitmapDescriptor>> bitmapFutures = [
       for (final Bus bus in buses)
-        MarkerHelper.createCustomMarkerBitmap(bus.RouteNo ?? '', buses.indexOf(bus), image),
+        MarkerHelper.createCustomMarkerBitmap(bus.RouteNo ?? '', buses.indexOf(bus), image, pixelRatio: _pixelRatio),
     ];
 
     final List<BitmapDescriptor> descriptors =
@@ -292,17 +294,43 @@ class _TransitAppState extends State<TransitApp> {
         onTap: () {
           setState(() {
             _mapPolylines.clear();
+            _routeStopMarkers = {};
           });
-          if (bus.RouteMap?.Href != null) {
-            RouteMapCoordinateHelper()
-                .getLatLng(bus.RouteMap!.Href!)
-                .then((List<List<LatLng>> value) {
-              int index = 0;
-              for (final List<LatLng> list in value) {
-                addLines(bus.RouteNo ?? '', list, index);
-                index++;
-              }
-            });
+          final routeNo = bus.RouteNo ?? '';
+          final color = GtfsStaticService().getRouteColor(routeNo, isDark: darkModeOn);
+          final tripId = bus.TripId?.toString();
+          final tripShape = tripId != null
+              ? GtfsStaticService().getShapeForTrip(tripId)
+              : null;
+          if (tripShape != null) {
+            addLines(routeNo, tripShape, 0, color);
+          } else {
+            final shapes = GtfsStaticService().getShapesForRoute(routeNo);
+            for (int i = 0; i < shapes.length; i++) {
+              addLines(routeNo, shapes[i], i, color);
+            }
+          }
+          if (tripId != null) {
+            final stops = GtfsStaticService().getStopsForTrip(tripId);
+            if (stops.isNotEmpty) {
+              MarkerHelper.createDotMarker(size: 10, pixelRatio: _pixelRatio)
+                  .then((dotIcon) {
+                final markers = <Marker>{};
+                for (final stop in stops) {
+                  if (stop.Latitude == null || stop.Longitude == null) continue;
+                  final snapped = tripShape != null
+                      ? _snapToPolyline(LatLng(stop.Latitude!, stop.Longitude!), tripShape)
+                      : LatLng(stop.Latitude!, stop.Longitude!);
+                  markers.add(Marker(
+                    markerId: MarkerId('routestop_${stop.StopNo}'),
+                    position: snapped,
+                    icon: dotIcon,
+                    anchor: const Offset(0.5, 0.5),
+                  ));
+                }
+                setState(() { _routeStopMarkers = markers; });
+              });
+            }
           }
         },
         markerId: MarkerId(
@@ -323,17 +351,43 @@ class _TransitAppState extends State<TransitApp> {
     return l;
   }
 
-  void addLines(String routeNum, List<LatLng> listofLatLng, int index) {
+  /// Returns the closest point on [polyline] to [point].
+  LatLng _snapToPolyline(LatLng point, List<LatLng> polyline) {
+    double bestDist = double.infinity;
+    LatLng best = polyline.first;
+    for (int i = 0; i < polyline.length - 1; i++) {
+      final a = polyline[i];
+      final b = polyline[i + 1];
+      final ax = a.longitude, ay = a.latitude;
+      final bx = b.longitude, by = b.latitude;
+      final px = point.longitude, py = point.latitude;
+      final dx = bx - ax, dy = by - ay;
+      final lenSq = dx * dx + dy * dy;
+      double t = lenSq == 0 ? 0 : ((px - ax) * dx + (py - ay) * dy) / lenSq;
+      t = t.clamp(0.0, 1.0);
+      final cx = ax + t * dx, cy = ay + t * dy;
+      final d = (px - cx) * (px - cx) + (py - cy) * (py - cy);
+      if (d < bestDist) {
+        bestDist = d;
+        best = LatLng(cy, cx);
+      }
+    }
+    return best;
+  }
+
+  void addLines(String routeNum, List<LatLng> listofLatLng, int index, Color color) {
     final PolylineId polylineId = PolylineId(index.toString());
-    final Polyline polyline = Polyline(
-      polylineId: polylineId,
-      consumeTapEvents: true,
-      color: Colors.teal,
-      width: 5,
-      points: listofLatLng,
-    );
     setState(() {
-      _mapPolylines[polylineId] = polyline;
+      _mapPolylines[polylineId] = Polyline(
+        polylineId: polylineId,
+        consumeTapEvents: true,
+        color: color,
+        width: 8,
+        jointType: JointType.round,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        points: listofLatLng,
+      );
     });
   }
 
@@ -364,6 +418,7 @@ class _TransitAppState extends State<TransitApp> {
           image,
           highlightedStopNo == stop.StopNo ? 60 : 38,
           highlightedStopNo == stop.StopNo ? 60 : 38,
+          pixelRatio: _pixelRatio,
         ),
     ];
 
@@ -614,10 +669,18 @@ class _TransitAppState extends State<TransitApp> {
   /// Builds the UI
   ///
   @override
-  Widget build(BuildContext context) => AnnotatedRegion<SystemUiOverlayStyle>(
+  Widget build(BuildContext context) {
+    _pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
         value: darkModeOn ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
         child: MaterialApp(
         debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color.fromRGBO(171, 171, 171, 1),
+            primary: const Color.fromRGBO(171, 171, 171, 1),
+          ),
+        ),
         home: Scaffold(
           key: _scaffoldKey,
           resizeToAvoidBottomInset: false,
@@ -645,8 +708,8 @@ class _TransitAppState extends State<TransitApp> {
                             (selectedPattern as String).substring(0, 1));
                   })
                   .toSet()
-                  .union(Set.from(
-                      selectedStop == null ? [] : [selectedStop])),
+                  .union(Set.from(selectedStop == null ? [] : [selectedStop]))
+                  .union(_routeStopMarkers),
               onTap: (LatLng a) {
                 tappedIntoStop = false;
                 _searchBarController.clear();
@@ -657,6 +720,7 @@ class _TransitAppState extends State<TransitApp> {
                     scrollSheetDotList = scrollSheetDotListCopy!;
                   }
                   _mapPolylines.clear();
+                  _routeStopMarkers = {};
                 });
               },
               onCameraIdle: () {
@@ -702,49 +766,44 @@ class _TransitAppState extends State<TransitApp> {
               child: Positioned(
                 top: 116,
                 right: 7,
-                left: 7,
-                child: Align(
-                  alignment: Alignment.topRight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: getColorFromHex('cfd1d4'),
-                      borderRadius:
-                          BorderRadius.all(Radius.circular(20)),
-                    ),
-                    child: ToggleButtons(
-                      fillColor: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      children: const <Widget>[
-                        Icon(Icons.directions_bus),
-                        Icon(Icons.pin_drop),
-                      ],
-                      onPressed: (int index) {
+                child: SizedBox(
+                  height: 50,
+                  width: 50,
+                  child: FittedBox(
+                    child: FloatingActionButton(
+                      heroTag: 'toggleMode',
+                      shape: const CircleBorder(),
+                      elevation: 1,
+                      onPressed: () {
                         vibrate();
-                        if (nextBusesCopy != null &&
-                            scrollSheetDotListCopy != null) {
+                        final bool switchingToStops = isSelected[0];
+                        if (nextBusesCopy != null && scrollSheetDotListCopy != null) {
                           nextBuses = nextBusesCopy!;
                           scrollSheetDotList = scrollSheetDotListCopy!;
                         }
-                        if (index == 0) {
-                          updateBuses();
-                          setState(() {
-                            zoomBool = false;
-                          });
-                        } else {
+                        if (switchingToStops) {
                           _mapPolylines.clear();
+                          _routeStopMarkers = {};
                           showZoomInIfNeeded();
                           getLocationAndUpdateStops();
+                        } else {
+                          updateBuses();
+                          setState(() { zoomBool = false; });
                         }
                         setState(() {
-                          for (int buttonIndex = 0;
-                              buttonIndex < isSelected.length;
-                              buttonIndex++) {
-                            isSelected[buttonIndex] =
-                                buttonIndex == index;
-                          }
+                          isSelected = switchingToStops ? [false, true] : [true, false];
                         });
                       },
-                      isSelected: isSelected,
+                      backgroundColor: darkModeOn
+                          ? const Color.fromRGBO(50, 52, 58, 1)
+                          : const Color.fromRGBO(255, 255, 255, 0.95),
+                      child: Icon(
+                        isSelected[0] ? Icons.directions_bus : Icons.pin_drop,
+                        size: 24,
+                        color: darkModeOn
+                            ? Colors.white70
+                            : getColorFromHex('10295D'),
+                      ),
                     ),
                   ),
                 ),
@@ -794,10 +853,7 @@ class _TransitAppState extends State<TransitApp> {
                 },
                 emptyWidget: const Text(
                   'No Stops Found',
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontSize: 18,
-                  ),
+                  style: TextStyle(fontSize: 18),
                 ),
                 onItemFound: (Stop post, int index) {
                   return ListTile(
@@ -879,6 +935,7 @@ class _TransitAppState extends State<TransitApp> {
         ),
       ),
     );
+  }
 
   void showZoomInIfNeeded() {
     mapController?.getZoomLevel().then((value) {
@@ -912,7 +969,7 @@ class _TransitAppState extends State<TransitApp> {
       updateBuses();
     }
     load('images/StopIcon.png').then((image) {
-      MarkerHelper.createCustomMarkerBitmapNoText(image, 56, 56)
+      MarkerHelper.createCustomMarkerBitmapNoText(image, 56, 56, pixelRatio: _pixelRatio)
           .then((bitmapDescriptor) {
         double? latitude;
         double? longitude;

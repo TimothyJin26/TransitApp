@@ -47,6 +47,6 @@ class GtfsUtil {
     final spaceIdx = on.indexOf(' ');
     final streetName =
         spaceIdx >= 0 ? on.substring(spaceIdx + 1) : on;
-    return '${atStreet.trim()} and $streetName';
+    return '${atStreet.trim()} at $streetName';
   }
 }
