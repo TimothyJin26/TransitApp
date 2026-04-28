@@ -161,9 +161,10 @@ class _BusTileState extends State<BusTile> with SingleTickerProviderStateMixin {
           children: [
             SizedBox(
               width: 70,
-              child: Text(routeNo,
+              child: AutoSizeText(routeNo,
                   textAlign: TextAlign.center,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  minFontSize: 20,
                   style: TextStyle(
                       fontSize: routeNo.length < 3 ? 50 : 35,
                       height: 1.0,

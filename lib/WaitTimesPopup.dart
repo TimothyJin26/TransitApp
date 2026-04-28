@@ -8,12 +8,14 @@ class WaitTimesPopup extends StatefulWidget {
   final String routeNo;
   final String pattern;
   final String stopNo;
+  final bool isDarkMode;
 
   const WaitTimesPopup({
     super.key,
     required this.routeNo,
     required this.pattern,
     required this.stopNo,
+    this.isDarkMode = false,
   });
 
   @override
@@ -42,12 +44,34 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
     });
   }
 
+  static const _acronyms = {'UBC', 'SFU', 'VCC', 'YVR', 'BCIT', 'NW'};
+
+  String _toTitleCase(String s) {
+    return s.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      if (_acronyms.contains(word)) return word;
+      return word.split('-').map((part) {
+        if (part.isEmpty) return part;
+        if (_acronyms.contains(part)) return part;
+        return '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}';
+      }).join('-');
+    }).join(' ');
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool dark = widget.isDarkMode;
+    final headerBg = dark ? colorFromHex('1b2336') : colorFromHex('#024D7E');
+    final listBg = dark ? colorFromHex('252d3d') : Colors.white;
+    final textColor = dark ? Colors.white70 : colorFromHex('#0d2036');
+    final dividerColor = dark
+        ? Colors.white.withAlpha(20)
+        : Colors.black.withAlpha(18);
+
     return Scaffold(
       body: Container(
         padding: const EdgeInsets.only(top: 36.0),
-        color: colorFromHex('#024D7E'),
+        color: headerBg,
         child: Column(
           children: [
             Row(
@@ -91,79 +115,83 @@ class _WaitTimesPopupState extends State<WaitTimesPopup> {
                 margin: const EdgeInsets.all(12.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: colorFromHex('#EEEEEE'),
+                    color: listBg,
                     borderRadius: BorderRadius.circular(24.0),
                   ),
                   child: loading
                       ? const Center(child: CircularProgressIndicator())
                       : trips.isEmpty
-                          ? const Center(child: Text('No upcoming departures'))
-                          : Scrollbar(
-                              child: ListView.builder(
-                                scrollDirection: Axis.vertical,
-                                shrinkWrap: true,
-                                itemCount: _visibleCount < trips.length
-                                    ? _visibleCount + 1  // +1 for "Load more" button
-                                    : trips.length,
-                                padding: const EdgeInsets.fromLTRB(8.0, 16.0, 8.0, 16.0),
-                                itemBuilder: (context, index) {
-                                  if (index == _visibleCount) {
-                                    return TextButton(
-                                      onPressed: () => setState(() {
-                                        _visibleCount += _pageSize;
-                                      }),
-                                      child: const Text('Load more'),
-                                    );
-                                  }
-                                  final trip = trips[index];
-                                  final isLive = trip.LastUpdate != null &&
-                                      trip.LastUpdate!.isNotEmpty;
-                                  return ListTile(
-                                    title: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 90,
-                                          child: Text(
-                                            trip.ExpectedLeaveTime ?? '',
-                                            style: TextStyle(
-                                              color: colorFromHex('#0d2036'),
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 18,
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            '${trip.Destination ?? ''}',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: colorFromHex('#0d2036'),
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                        ),
-                                        if (isLive)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFF1bab65),
-                                              borderRadius: BorderRadius.circular(6),
-                                            ),
-                                            child: const Text(
-                                              'LIVE',
+                          ? Center(
+                              child: Text('No upcoming departures',
+                                  style: TextStyle(color: textColor)))
+                          : ClipRRect(
+                              borderRadius: BorderRadius.circular(24.0),
+                              child: Scrollbar(
+                                child: ListView.separated(
+                                  scrollDirection: Axis.vertical,
+                                  shrinkWrap: true,
+                                  itemCount: _visibleCount < trips.length
+                                      ? _visibleCount + 1
+                                      : trips.length,
+                                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                  separatorBuilder: (context, index) => Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                    child: Divider(
+                                      height: 1,
+                                      thickness: 1,
+                                      color: dividerColor,
+                                    ),
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    if (index == _visibleCount) {
+                                      return TextButton(
+                                        onPressed: () => setState(() {
+                                          _visibleCount += _pageSize;
+                                        }),
+                                        child: const Text('Load more'),
+                                      );
+                                    }
+                                    final trip = trips[index];
+                                    final isLive = trip.LastUpdate != null &&
+                                        trip.LastUpdate!.isNotEmpty;
+                                    return ListTile(
+                                      title: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 90,
+                                            child: Text(
+                                              trip.ExpectedLeaveTime ?? '',
                                               style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
+                                                color: textColor,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15,
                                               ),
                                             ),
                                           ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                                          Expanded(
+                                            child: Text(
+                                              _toTitleCase(trip.Destination ?? ''),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: textColor,
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isLive)
+                                            const Icon(Icons.rss_feed,
+                                                size: 16,
+                                                color: Color(0xFF1bab65))
+                                          else
+                                            const SizedBox.shrink(),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                 ),

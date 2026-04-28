@@ -1,0 +1,17 @@
+flutter_native_splash:
+  # Light mode
+  color: "#a2c5e1"
+  image: images/splash-icon.png
+  color_dark: "#1b2336"
+  image_dark: images/splash-icon.png
+
+  # iOS
+  ios: true
+  # Android
+  android: true
+
+  android_12:
+    color: "#a2c5e1"
+    image: images/splash-icon.png
+    color_dark: "#1b2336"
+    image_dark: images/splash-icon.png

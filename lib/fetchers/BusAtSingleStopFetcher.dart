@@ -15,7 +15,10 @@ class BusAtSingleStopFetcher {
     final stopId = GtfsStaticService().getStopId(stopCode);
     if (stopId == null) return [];
 
-    final entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    var entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    if (entries.isEmpty) {
+      entries = await GtfsRealtimeService().getDeparturesForStop(busStopNum);
+    }
     final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     final static_ = GtfsStaticService();
     final List<BothDirectionRouteWithTrips> routeTrips = [];

@@ -78,7 +78,13 @@ class GtfsStaticService {
   /// Must be awaited before calling any other method.
   Future<void> ensureLoaded() {
     if (_stopsLoaded && _staticLoaded) return Future.value();
-    return _loadFuture ??= _doLoad();
+    return _loadFuture ??= _doLoad().catchError((e, st) {
+      debugPrint('GtfsStaticService: load error: $e');
+      _loadFuture = null; // allow retry next call
+      if (!_stopsLoaded) {
+        return _loadStopsAsset().then((_) { _stopsLoaded = true; });
+      }
+    });
   }
 
   Future<void> _doLoad() async {
@@ -104,7 +110,7 @@ class GtfsStaticService {
       // Only attempt download if we haven't tried recently this session.
       final now = DateTime.now();
       if (_lastStaticAttempt == null ||
-          now.difference(_lastStaticAttempt!).inMinutes >= 5) {
+          now.difference(_lastStaticAttempt!).inSeconds >= 30) {
         _lastStaticAttempt = now;
         zipBytes = await _downloadZipBytes();
         if (zipBytes != null) {
@@ -170,6 +176,28 @@ class GtfsStaticService {
       }
     }
     return isDark ? const Color.fromARGB(255, 40, 92, 176) : const Color(0xFF1b2336);
+  }
+
+  /// Returns all trip IDs whose scheduled route serves [stopId] today.
+  Set<String> getTripIdsServingStop(String stopId) {
+    final deps = _stopTimes[stopId];
+    if (deps == null) return {};
+    return deps.map((d) => d.tripId).toSet();
+  }
+
+  /// Returns all route IDs (GTFS internal) for routes that serve [stopId] today.
+  Set<String> getRouteIdsServingStop(String stopId) {
+    final deps = _stopTimes[stopId];
+    if (deps == null) return {};
+    return deps
+        .map((d) => _trips[d.tripId]?.routeId)
+        .whereType<String>()
+        .toSet();
+  }
+
+  /// Returns true if [tripId]'s scheduled stops include [stopId].
+  bool doesTripServeStop(String tripId, String stopId) {
+    return _tripStops[tripId]?.contains(stopId) ?? false;
   }
 
   /// Returns the ordered stops for a specific [tripId].

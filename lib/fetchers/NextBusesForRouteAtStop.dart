@@ -25,8 +25,12 @@ class NextBusesForRouteAtStop {
       return patternHelper(GtfsUtil.directionFromStop(stop.OnStreet, directionId)) == pattern;
     }
 
-    // Realtime entries
-    final entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    // Realtime entries — try internal stop ID first, fall back to stop code string
+    // (some feeds index by stop code rather than internal ID)
+    var entries = await GtfsRealtimeService().getDeparturesForStop(stopId);
+    if (entries.isEmpty) {
+      entries = await GtfsRealtimeService().getDeparturesForStop(stopNo);
+    }
     for (final entry in entries) {
       final tu = entry.tripUpdate;
       final stu = entry.stopTimeUpdate;

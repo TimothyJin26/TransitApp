@@ -80,8 +80,8 @@ class BusSheet extends StatelessWidget {
                           alignment: Alignment.center,
                           child: RichText(
                             text: TextSpan(
-                              style: const TextStyle(
-                                color: Colors.black,
+                              style: TextStyle(
+                                color: darkModeOn ? Colors.white70 : Colors.black,
                                 fontWeight: FontWeight.w500,
                                 fontStyle: FontStyle.normal,
                                 fontSize: 19,

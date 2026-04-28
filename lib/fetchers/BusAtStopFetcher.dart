@@ -41,7 +41,10 @@ class BusAtStopFetcher {
       final realtimeTripIds = <String>{};
       final tripsForStop = <String, List<Trip>>{}; // "routeNo|directionId" -> trips
 
-      final entries = await rt.getDeparturesForStop(stopId);
+      var entries = await rt.getDeparturesForStop(stopId);
+      if (entries.isEmpty) {
+        entries = await rt.getDeparturesForStop(stop.StopNo.toString());
+      }
       for (final entry in entries) {
         final tu = entry.tripUpdate;
         final stu = entry.stopTimeUpdate;

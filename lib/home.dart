@@ -156,6 +156,9 @@ class _TransitAppState extends State<TransitApp> {
     darkModeOn = SunsetHelper.isDark();
     _currentMapStyle = darkModeOn ? _MAP_STYLE : null;
 
+    // Start GTFS static load immediately so it's ready by the time fetchers need it.
+    GtfsStaticService().ensureLoaded();
+
     loadListOfStops().then((stops) {
       listOfStops = stops;
 
@@ -294,7 +297,7 @@ class _TransitAppState extends State<TransitApp> {
       final marker = Marker(
         onTap: () => _onBusMarkerTap(bus.RouteNo ?? '', bus.TripId?.toString()),
         markerId: MarkerId(
-            '${bus.VehicleNo}!${bus.RouteNo}!${bus.Pattern}'),
+            '${bus.VehicleNo?.isNotEmpty == true ? bus.VehicleNo : i}!${bus.RouteNo}!${bus.Pattern}'),
         position: LatLng(
             (bus.Latitude ?? 0) - 0.00005, bus.Longitude ?? 0),
         infoWindow: InfoWindow(
@@ -473,26 +476,31 @@ class _TransitAppState extends State<TransitApp> {
 
   Future<void> _loadStopViewBusMarkers(int stopCode) async {
     await GtfsStaticService().ensureLoaded();
-    final internalStopId = GtfsStaticService().getStopId(stopCode);
+    final static_ = GtfsStaticService();
+    final internalStopId = static_.getStopId(stopCode);
     if (internalStopId == null) return;
 
-    final tripIds = await GtfsRealtimeService().getTripIdsForStop(internalStopId);
-    if (tripIds.isEmpty) return;
+    final routeIds = static_.getRouteIdsServingStop(internalStopId);
 
     final allPositions = await GtfsRealtimeService().getVehiclePositions();
-    final matching = allPositions.where((v) => tripIds.contains(v.tripId)).toList();
+    final matching = allPositions.where((v) {
+      final routeId = v.routeId.isNotEmpty
+          ? v.routeId
+          : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      if (routeIds.contains(routeId)) return true;
+      // Fallback: check directly if the vehicle's trip visits this stop
+      return static_.doesTripServeStop(v.tripId, internalStopId);
+    }).toList();
 
     if (matching.isEmpty) return;
 
     final image = await load('images/bus-icon-outline.png');
-    final static_ = GtfsStaticService();
     final bitmapFutures = <Future<BitmapDescriptor>>[];
     for (final v in matching) {
-      String routeShort = static_.getRouteShortName(v.routeId) ?? '';
-      if (routeShort.isEmpty && v.routeId.isNotEmpty) {
-        routeShort = v.routeId;
-      }
-      routeShort = removeZeroes(routeShort);
+      final routeId = v.routeId.isNotEmpty
+          ? v.routeId
+          : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      String routeShort = removeZeroes(static_.getRouteShortName(routeId) ?? routeId);
       bitmapFutures.add(MarkerHelper.createCustomMarkerBitmap(
         routeShort, 0, image, pixelRatio: _pixelRatio));
     }
@@ -501,7 +509,8 @@ class _TransitAppState extends State<TransitApp> {
     final markers = <Marker>{};
     for (int i = 0; i < matching.length; i++) {
       final v = matching[i];
-      final routeNo = removeZeroes(static_.getRouteShortName(v.routeId) ?? v.routeId);
+      final routeId = v.routeId.isNotEmpty ? v.routeId : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      final routeNo = removeZeroes(static_.getRouteShortName(routeId) ?? routeId);
       markers.add(Marker(
         markerId: MarkerId('stopview_${v.vehicleId}'),
         position: LatLng(v.latitude - 0.00005, v.longitude),
@@ -582,18 +591,20 @@ class _TransitAppState extends State<TransitApp> {
   }
 
   void updateBuses() async {
-    setState(() {
-      isLoading = true;
-    });
-    final List<Bus> buses = await LocationFetcher().fetchAllBuses();
-    final List<Marker> list = await getBusList(buses);
-    setState(() {
-      isLoading = false;
-      _markers.clear();
-      for (final Marker m in list) {
-        _markers[m.markerId.toString()] = m;
-      }
-    });
+    setState(() { isLoading = true; });
+    try {
+      final List<Bus> buses = await LocationFetcher().fetchAllBuses();
+      final List<Marker> list = await getBusList(buses);
+      setState(() {
+        isLoading = false;
+        _markers.clear();
+        for (final Marker m in list) {
+          _markers[m.markerId.toString()] = m;
+        }
+      });
+    } catch (_) {
+      setState(() { isLoading = false; });
+    }
   }
 
   void getLocationAndUpdateStops() async {
@@ -674,6 +685,7 @@ class _TransitAppState extends State<TransitApp> {
           routeNo: removeZeroes(routeNo),
           pattern: patternHelper(pattern),
           stopNo: stopNo,
+          isDarkMode: darkModeOn,
         );
       },
       fullscreenDialog: true,
