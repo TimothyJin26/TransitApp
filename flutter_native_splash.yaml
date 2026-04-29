@@ -1,6 +1,5 @@
 flutter_native_splash:
-  # Light mode
-  color: "#a2c5e1"
+  color: "#e3e7ea"
   image: images/splash-icon.png
   color_dark: "#1b2336"
   image_dark: images/splash-icon.png
@@ -11,7 +10,7 @@ flutter_native_splash:
   android: true
 
   android_12:
-    color: "#a2c5e1"
+    color: "#e3e7ea"
     image: images/splash-icon.png
     color_dark: "#1b2336"
     image_dark: images/splash-icon.png

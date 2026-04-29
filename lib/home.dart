@@ -26,6 +26,7 @@ import 'WaitTimesPopup.dart';
 import 'bus_sheet.dart';
 import 'stop_search_bar.dart';
 import 'transit_util.dart';
+import 'util/TransitUtil.dart';
 import 'fetchers/BusAtStopFetcher.dart';
 import 'package:transitapp/services/GtfsStaticService.dart';
 import 'fetchers/StopFetcher.dart';
@@ -143,7 +144,6 @@ class _TransitAppState extends State<TransitApp> {
   @override
   void initState() {
     super.initState();
-
     try {
       positionStream =
           Geolocator.getPositionStream().listen((Position position) {
@@ -400,6 +400,8 @@ class _TransitAppState extends State<TransitApp> {
         final Stop newStop = Stop()
           ..StopNo = s.StopNo
           ..Name = s.Name
+          ..OnStreet = s.OnStreet
+          ..AtStreet = s.AtStreet
           ..Longitude = s.Longitude
           ..Latitude = s.Latitude;
         toRet.add(newStop);
@@ -429,25 +431,7 @@ class _TransitAppState extends State<TransitApp> {
     for (int i = 0; i < stops.length; i++) {
       final Stop stop = stops[i];
       final marker = Marker(
-        onTap: () {
-          setState(() {
-            if (!tappedIntoStop) {
-              nextBusesCopy =
-                  List<BothDirectionRouteWithTrips>.from(nextBuses);
-              scrollSheetDotListCopy =
-                  List<int>.from(scrollSheetDotList);
-            }
-            tappedIntoStop = true;
-            _tappedStop = stop;
-            count = 2;
-            BusAtSingleStopFetcher()
-                .busAtSingleStopFetcher(stop, stop.StopNo.toString())
-                .then((List<BothDirectionRouteWithTrips> value) {
-              renderListOfNextBuses(value);
-            });
-          });
-          if (stop.StopNo != null) _loadStopViewBusMarkers(stop.StopNo!);
-        },
+        onTap: () => _onStopTapped(stop),
         markerId: MarkerId(stop.StopNo.toString()),
         position: LatLng(stop.Latitude ?? 0, stop.Longitude ?? 0),
         infoWindow: InfoWindow(
@@ -459,6 +443,24 @@ class _TransitAppState extends State<TransitApp> {
       l.add(marker);
     }
     return l;
+  }
+
+  void _onStopTapped(Stop stop) {
+    setState(() {
+      if (!tappedIntoStop) {
+        nextBusesCopy = List<BothDirectionRouteWithTrips>.from(nextBuses);
+        scrollSheetDotListCopy = List<int>.from(scrollSheetDotList);
+      }
+      tappedIntoStop = true;
+      _tappedStop = stop;
+      count = 2;
+      BusAtSingleStopFetcher()
+          .busAtSingleStopFetcher(stop, stop.StopNo.toString())
+          .then((List<BothDirectionRouteWithTrips> value) {
+        renderListOfNextBuses(value);
+      });
+    });
+    if (stop.StopNo != null) _loadStopViewBusMarkers(stop.StopNo!);
   }
 
   void _refreshTappedStop() {
@@ -630,21 +632,24 @@ class _TransitAppState extends State<TransitApp> {
     }
   }
 
+  void _applyMarkerDiff(List<Marker> newList) {
+    final newMap = {for (final m in newList) m.markerId.toString(): m};
+    _markers.removeWhere((id, _) => !newMap.containsKey(id));
+    for (final entry in newMap.entries) {
+      _markers[entry.key] = entry.value;
+    }
+  }
+
   void updateStops(String latitude, String longitude) async {
     final List<Stop> stops =
         await StopFetcher().stopFetcher(latitude, longitude);
     final List<Marker> list = await getStopList(stops);
-    setState(() {
-      _markers.clear();
-      for (final Marker m in list) {
-        _markers[m.markerId.toString()] = m;
-      }
-    });
+    if (!mounted) return;
+    setState(() => _applyMarkerDiff(list));
   }
 
   void updateStopsForMap(double latitude1, double latitude2,
       double longitude1, double longitude2) async {
-    _markers.clear();
     final List<Stop> validStops = [
       for (final Stop s in listOfStops)
         if ((s.Latitude ?? 0) < latitude1 &&
@@ -654,12 +659,8 @@ class _TransitAppState extends State<TransitApp> {
           s,
     ];
     final List<Marker> list = await getStopList(validStops);
-    setState(() {
-      _markers.clear();
-      for (final Marker m in list) {
-        _markers[m.markerId.toString()] = m;
-      }
-    });
+    if (!mounted) return;
+    setState(() => _applyMarkerDiff(list));
   }
 
   Future<ui.Image> load(String asset) async {
@@ -690,6 +691,7 @@ class _TransitAppState extends State<TransitApp> {
       },
       fullscreenDialog: true,
     ));
+    if (mounted) FocusScope.of(context).unfocus();
   }
 
   Future<void> _currentLocation() async {
@@ -737,6 +739,7 @@ class _TransitAppState extends State<TransitApp> {
         home: Scaffold(
           key: _scaffoldKey,
           resizeToAvoidBottomInset: false,
+          backgroundColor: darkModeOn ? colorFromHex('1b2336') : Colors.white,
           body: Stack(children: <Widget>[
             GoogleMap(
               myLocationEnabled: isLocationOnMapEnabled,
@@ -771,6 +774,7 @@ class _TransitAppState extends State<TransitApp> {
                 tappedIntoStop = false;
                 _searchBarController.clear();
                 setState(() {
+                  highlightedStopNo = null;
                   if (nextBusesCopy != null &&
                       scrollSheetDotListCopy != null) {
                     nextBuses = nextBusesCopy!;
@@ -928,37 +932,17 @@ class _TransitAppState extends State<TransitApp> {
                     title: Text(post.StopNo.toString()),
                     subtitle: Text(post.Name ?? ''),
                     onTap: () {
-                      setState(() {
-                        if (!tappedIntoStop) {
-                          nextBusesCopy =
-                              List<BothDirectionRouteWithTrips>.from(
-                                  nextBuses);
-                          scrollSheetDotListCopy =
-                              List<int>.from(scrollSheetDotList);
-                        }
-                        tappedIntoStop = true;
-                        _tappedStop = post;
-                        isSelected = [false, true];
-                        BusAtSingleStopFetcher()
-                            .busAtSingleStopFetcher(
-                                post, post.StopNo.toString())
-                            .then((List<BothDirectionRouteWithTrips>
-                                value) {
-                          renderListOfNextBuses(value);
-                        });
-                      });
+                      FocusScope.of(context).unfocus();
+                      _onStopTapped(post);
                       _searchBarController.clear();
-                      final CameraPosition kLake = CameraPosition(
-                          target: LatLng(
-                              post.Latitude ?? 0, post.Longitude ?? 0),
-                          zoom: 18);
                       highlightedStopNo = post.StopNo;
-                      count = 2;
                       updateStops(
                           (post.Latitude ?? 0).toString(),
                           (post.Longitude ?? 0).toString());
                       mapController?.animateCamera(
-                          CameraUpdate.newCameraPosition(kLake));
+                          CameraUpdate.newCameraPosition(CameraPosition(
+                              target: LatLng(post.Latitude ?? 0, post.Longitude ?? 0),
+                              zoom: 18)));
                     },
                   );
                 },

@@ -182,6 +182,13 @@ class BusSheet extends StatelessWidget {
                 ),
               ),
             ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.of(context).viewPadding.bottom,
+              child: GestureDetector(behavior: HitTestBehavior.opaque),
+            ),
           ]),
         );
       },

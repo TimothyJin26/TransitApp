@@ -30,23 +30,29 @@ class GtfsUtil {
     return headsign.replaceFirst(RegExp(r'^\w+\s+'), '');
   }
 
+  static const _directionWords = {
+    'northbound', 'southbound', 'eastbound', 'westbound', 'nb', 'sb', 'eb', 'wb'
+  };
+
+  static String _stripDirection(String s) {
+    final spaceIdx = s.indexOf(' ');
+    if (spaceIdx < 0) return s;
+    if (_directionWords.contains(s.substring(0, spaceIdx).toLowerCase())) {
+      return s.substring(spaceIdx + 1);
+    }
+    return s;
+  }
+
   /// Build the nextStop display string from a stop's street fields.
   static String nextStopLabel(
       {required String? name,
       required String? onStreet,
       required String? atStreet}) {
-    if (atStreet == null ||
-        atStreet.isEmpty ||
-        onStreet == null ||
-        onStreet.isEmpty) {
-      return name ?? '';
+    final on = onStreet?.trim() ?? '';
+    final at = atStreet?.trim() ?? '';
+    if (at.isEmpty) {
+      return _stripDirection(on.isNotEmpty ? on : (name ?? ''));
     }
-    final on = onStreet.trim();
-    // Strip leading direction word (e.g. "Westbound ") so we show
-    // just the street name, matching the old RTTI format.
-    final spaceIdx = on.indexOf(' ');
-    final streetName =
-        spaceIdx >= 0 ? on.substring(spaceIdx + 1) : on;
-    return '${atStreet.trim()} at $streetName';
+    return '$at at ${_stripDirection(on)}';
   }
 }
