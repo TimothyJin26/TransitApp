@@ -59,7 +59,7 @@ class MarkerHelper {
     final double pillExtraH = ageLabel != null ? (pillLogH * 0.5).ceilToDouble() : 0;
     final int totalH = ph + pillExtraH.round();
 
-    final double fontSize = (title.length >= 3 ? height * 0.33 : height * 0.42) * pixelRatio;
+    final double fontSize = (title.length >= 3 ? height * 0.27 : height * 0.35) * pixelRatio;
 
     final TextPainter tp = TextPainter(
       text: TextSpan(

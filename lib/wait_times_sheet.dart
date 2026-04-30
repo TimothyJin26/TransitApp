@@ -155,13 +155,13 @@ class WaitTimesSheetState extends State<WaitTimesSheet>
               ),
               Positioned(
                 left: 16,
-                top: 4,
+                top: -4,
                 child: Text(
                   widget.routeNo,
                   style: TextStyle(
                     color: widget.isDarkMode ? Colors.white : Colors.black87,
                     fontWeight: FontWeight.w800,
-                    fontSize: 46,
+                    fontSize: 54,
                     height: 1.0,
                   ),
                 ),
