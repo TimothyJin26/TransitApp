@@ -14,16 +14,19 @@ import 'package:flutter/services.dart' show rootBundle, SystemUiOverlayStyle;
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:transitapp/fetchers/BusAtSingleStopFetcher.dart';
+import 'package:transitapp/proto/GtfsRealtimeReader.dart';
 import 'package:transitapp/services/GtfsRealtimeService.dart';
 import 'package:transitapp/fetchers/LocationFetcher.dart';
 import 'package:transitapp/models/Bus.dart';
+import 'package:transitapp/util/GtfsUtil.dart';
 import 'package:transitapp/util/LifecycleEventHandler.dart';
 import 'package:transitapp/util/MarkerHelper.dart';
 import 'package:transitapp/util/SunsetHelper.dart';
 import 'package:vibration/vibration.dart';
 
-import 'WaitTimesPopup.dart';
 import 'bus_sheet.dart';
+import 'fetchers/NextBusesForRouteAtStop.dart';
+import 'wait_times_sheet.dart';
 import 'stop_search_bar.dart';
 import 'transit_util.dart';
 import 'util/TransitUtil.dart';
@@ -92,6 +95,17 @@ class _TransitAppState extends State<TransitApp> {
   bool hasLoaded = false;
 
   GoogleMapController? mapController;
+  bool _mapReady = false;
+  bool _showWaitTimes = false;
+  String _wtRouteNo = '';
+  List<Trip> _wtTrips = [];
+  bool _wtLoading = false;
+  Marker? _wtStopMarker;
+  final _waitTimesKey = GlobalKey<WaitTimesSheetState>();
+  List<(GtfsVehiclePosition, String)> _wtBusEntries = []; // (vehicle, routeShort)
+  int _wtDirectionId = 0;
+  Timer? _wtAgeTimer;
+  ui.Image? _busIconImage;
   bool isLocationOnMapEnabled = false;
   String? _currentMapStyle;
   final StopSearchBarController _searchBarController = StopSearchBarController();
@@ -157,7 +171,7 @@ class _TransitAppState extends State<TransitApp> {
     _currentMapStyle = darkModeOn ? _MAP_STYLE : null;
 
     // Start GTFS static load immediately so it's ready by the time fetchers need it.
-    GtfsStaticService().ensureLoaded();
+    GtfsStaticService().invalidateCache().then((_) => GtfsStaticService().ensureLoaded());
 
     loadListOfStops().then((stops) {
       listOfStops = stops;
@@ -280,13 +294,22 @@ class _TransitAppState extends State<TransitApp> {
     super.dispose();
   }
 
+  static String? _ageLabel(DateTime? lastSeen) {
+    if (lastSeen == null) return null;
+    final secs = DateTime.now().difference(lastSeen).inSeconds;
+    if (secs <= 20) return null;
+    if (secs < 60) return '$secs';
+    return '${(secs / 60).floor()}m';
+  }
+
   Future<List<Marker>> getBusList(List<Bus> buses) async {
     final List<Marker> l = [];
     final ui.Image image = await load('images/bus-icon-outline.png');
 
     final List<Future<BitmapDescriptor>> bitmapFutures = [
       for (final Bus bus in buses)
-        MarkerHelper.createCustomMarkerBitmap(bus.RouteNo ?? '', buses.indexOf(bus), image, pixelRatio: _pixelRatio),
+        MarkerHelper.createCustomMarkerBitmap(bus.RouteNo ?? '', buses.indexOf(bus), image,
+            pixelRatio: _pixelRatio),
     ];
 
     final List<BitmapDescriptor> descriptors =
@@ -304,7 +327,8 @@ class _TransitAppState extends State<TransitApp> {
           title: () {
             final dest = bus.Destination ?? '';
             final toIdx = dest.toLowerCase().indexOf('/to ');
-            return toIdx != -1 ? dest.substring(toIdx + 4).trim() : dest;
+            final clean = toIdx != -1 ? dest.substring(toIdx + 4).trim() : dest;
+            return clean.isNotEmpty ? clean : null;
           }(),
         ),
         icon: descriptors[i],
@@ -676,22 +700,201 @@ class _TransitAppState extends State<TransitApp> {
     _currentLocation();
   }
 
-  Future<void> openWaitTimesPopup(
+  Future<void> _openWaitTimes(
       String routeNo, String pattern, String stopNo) async {
-    final BuildContext? ctx = _scaffoldKey.currentContext;
-    if (ctx == null) return;
-    await Navigator.of(ctx).push(MaterialPageRoute<void>(
-      builder: (BuildContext context) {
-        return WaitTimesPopup(
-          routeNo: removeZeroes(routeNo),
-          pattern: patternHelper(pattern),
-          stopNo: stopNo,
-          isDarkMode: darkModeOn,
-        );
-      },
-      fullscreenDialog: true,
-    ));
-    if (mounted) FocusScope.of(context).unfocus();
+    FocusScope.of(context).unfocus();
+    final cleanRoute = removeZeroes(routeNo);
+    final cleanPattern = patternHelper(pattern);
+    setState(() {
+      _showWaitTimes = true;
+      _wtRouteNo = cleanRoute;
+      _wtLoading = true;
+      _wtTrips = [];
+    });
+    final trips = await NextBusesForRouteAtStop()
+        .busAtSingleStopFetcher(stopNo, cleanRoute, cleanPattern);
+    if (!mounted) return;
+    setState(() {
+      _wtTrips = trips;
+      _wtLoading = false;
+    });
+    _loadWaitTimesMapData(
+      cleanRoute, pattern, stopNo,
+      tripId: trips.isNotEmpty ? trips.first.tripId : null,
+    );
+    _buildWtStopMarker(stopNo);
+  }
+
+  Future<void> _buildWtStopMarker(String stopNo) async {
+    final stopCode = int.tryParse(stopNo);
+    if (stopCode == null) return;
+    Stop? stop;
+    for (final s in listOfStops) {
+      if (s.StopNo == stopCode) { stop = s; break; }
+    }
+    if (stop == null || stop.Latitude == null || stop.Longitude == null) return;
+    final image = await load('images/StopIcon.png');
+    final icon = await MarkerHelper.createCustomMarkerBitmapNoText(
+        image, 38, 38, pixelRatio: _pixelRatio);
+    if (!mounted) return;
+    setState(() {
+      _wtStopMarker = Marker(
+        markerId: MarkerId('wt_stop_$stopNo'),
+        position: LatLng(stop!.Latitude!, stop.Longitude!),
+        icon: icon,
+      );
+    });
+  }
+
+  void _dismissWaitTimes() {
+    final sheetState = _waitTimesKey.currentState;
+    if (sheetState != null) {
+      sheetState.dismiss();
+    } else {
+      _clearWaitTimesState();
+    }
+  }
+
+  void _clearWaitTimesState() {
+    _wtAgeTimer?.cancel();
+    _wtAgeTimer = null;
+    _wtBusEntries = [];
+    setState(() {
+      _showWaitTimes = false;
+      _wtStopMarker = null;
+      _mapPolylines.clear();
+      _routeStopMarkers = {};
+      _stopViewBusMarkers = {};
+    });
+    if (tappedIntoStop && _tappedStop?.StopNo != null) {
+      _loadStopViewBusMarkers(_tappedStop!.StopNo!);
+    }
+  }
+
+  Future<void> _rebuildWtBusMarkers() async {
+    if (!mounted || !_showWaitTimes || _busIconImage == null) return;
+    final static_ = GtfsStaticService();
+    final allPositions = await GtfsRealtimeService().getVehiclePositions();
+    if (!mounted || !_showWaitTimes) return;
+
+    final routeNo = _wtRouteNo;
+    final directionId = _wtDirectionId;
+    final fresh = allPositions.where((v) {
+      final routeId = v.routeId.isNotEmpty
+          ? v.routeId
+          : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      if (removeZeroes(static_.getRouteShortName(routeId) ?? routeId) != routeNo) return false;
+      final tripInfo = static_.getTripInfo(v.tripId);
+      return tripInfo == null || tripInfo.directionId == directionId;
+    }).toList();
+
+    _wtBusEntries = fresh.map((v) {
+      final routeId = v.routeId.isNotEmpty
+          ? v.routeId
+          : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      return (v, removeZeroes(static_.getRouteShortName(routeId) ?? routeId));
+    }).toList();
+
+    if (_wtBusEntries.isEmpty) return;
+    final image = _busIconImage!;
+    final descriptors = await Future.wait(_wtBusEntries.map((e) =>
+        MarkerHelper.createCustomMarkerBitmap(e.$2, 0, image,
+            pixelRatio: _pixelRatio, ageLabel: _ageLabel(e.$1.lastSeen), isDark: darkModeOn)));
+    if (!mounted || !_showWaitTimes) return;
+    final markers = <Marker>{};
+    for (int i = 0; i < _wtBusEntries.length; i++) {
+      final v = _wtBusEntries[i].$1;
+      markers.add(Marker(
+        markerId: MarkerId('wt_bus_${v.vehicleId}_$i'),
+        position: LatLng(v.latitude - 0.00005, v.longitude),
+        icon: descriptors[i],
+        onTap: () => _onBusMarkerTap(_wtRouteNo, v.tripId),
+      ));
+    }
+    setState(() { _stopViewBusMarkers = markers; });
+  }
+
+  Future<void> _loadWaitTimesMapData(
+      String routeNo, String rawPattern, String stopNo,
+      {String? tripId}) async {
+    setState(() {
+      _mapPolylines.clear();
+      _routeStopMarkers = {};
+      _stopViewBusMarkers = {};
+    });
+
+    await GtfsStaticService().ensureLoaded();
+    final static_ = GtfsStaticService();
+    final color = static_.getRouteColor(routeNo, isDark: darkModeOn);
+
+    // Resolve directionId: use the trip's own GTFS record when available,
+    // otherwise fall back to inferring from the stop's street name.
+    int directionId;
+    if (tripId != null) {
+      directionId = static_.getTripInfo(tripId)?.directionId ?? 0;
+    } else {
+      final stopCode = int.tryParse(stopNo);
+      final refStop = stopCode != null ? static_.getStopByCode(stopCode) : null;
+      final dir0 = GtfsUtil.directionFromStop(refStop?.OnStreet, 0);
+      directionId = (dir0 == rawPattern) ? 0 : 1;
+    }
+    _wtDirectionId = directionId;
+
+    // Use the specific trip's shape if available, otherwise fall back to direction
+    if (tripId != null) {
+      final shape = static_.getShapeForTrip(tripId);
+      if (shape != null) addLines(routeNo, shape, 0, color);
+    } else {
+      final shapes = static_.getShapesForRouteAndDirection(routeNo, directionId);
+      for (int i = 0; i < shapes.length; i++) {
+        addLines(routeNo, shapes[i], i, color);
+      }
+    }
+
+    final repTripId = tripId ?? static_.getRepresentativeTripId(routeNo, directionId: directionId);
+    if (repTripId != null) {
+      final stops = static_.getStopsForTrip(repTripId);
+      final tripShape = static_.getShapeForTrip(repTripId);
+      if (stops.isNotEmpty) {
+        MarkerHelper.createDotMarker(size: 10, pixelRatio: _pixelRatio)
+            .then((dotIcon) {
+          final markers = <Marker>{};
+          for (final stop in stops) {
+            if (stop.Latitude == null || stop.Longitude == null) continue;
+            final pos = tripShape != null
+                ? _snapToPolyline(
+                    LatLng(stop.Latitude!, stop.Longitude!), tripShape)
+                : LatLng(stop.Latitude!, stop.Longitude!);
+            markers.add(Marker(
+              markerId: MarkerId('wt_routestop_${stop.StopNo}'),
+              position: pos,
+              icon: dotIcon,
+              anchor: const Offset(0.5, 0.5),
+            ));
+          }
+          if (mounted) setState(() { _routeStopMarkers = markers; });
+        });
+      }
+    }
+
+    final allPositions = await GtfsRealtimeService().getVehiclePositions();
+    final matching = allPositions.where((v) {
+      final routeId = v.routeId.isNotEmpty
+          ? v.routeId
+          : (static_.getTripInfo(v.tripId)?.routeId ?? '');
+      if (removeZeroes(static_.getRouteShortName(routeId) ?? routeId) != routeNo) {
+        return false;
+      }
+      final tripInfo = static_.getTripInfo(v.tripId);
+      return tripInfo == null || tripInfo.directionId == directionId;
+    }).toList();
+    if (matching.isEmpty || !mounted) return;
+
+    _busIconImage ??= await load('images/bus-icon-outline.png');
+
+    _wtAgeTimer?.cancel();
+    await _rebuildWtBusMarkers();
+    _wtAgeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _rebuildWtBusMarkers());
   }
 
   Future<void> _currentLocation() async {
@@ -754,6 +957,7 @@ class _TransitAppState extends State<TransitApp> {
               polylines: Set<Polyline>.of(_mapPolylines.values),
               markers: _markers.values
                   .where((marker) {
+                    if (_showWaitTimes) return false;
                     if (tappedIntoStop && isSelected[1]) {
                       return marker.markerId.value == _tappedStop?.StopNo.toString();
                     }
@@ -767,10 +971,15 @@ class _TransitAppState extends State<TransitApp> {
                             (selectedPattern as String).substring(0, 1));
                   })
                   .toSet()
-                  .union(Set.from(selectedStop == null ? [] : [selectedStop]))
+                  .union(Set.from(selectedStop == null || _showWaitTimes ? [] : [selectedStop]))
                   .union(_routeStopMarkers)
-                  .union(_stopViewBusMarkers),
+                  .union(_stopViewBusMarkers)
+                  .union(Set.from(_wtStopMarker == null ? [] : [_wtStopMarker])),
               onTap: (LatLng a) {
+                if (_showWaitTimes) {
+                  _dismissWaitTimes();
+                  return;
+                }
                 tappedIntoStop = false;
                 _searchBarController.clear();
                 setState(() {
@@ -789,6 +998,7 @@ class _TransitAppState extends State<TransitApp> {
                 }
               },
               onCameraIdle: () {
+                if (!_mapReady) setState(() => _mapReady = true);
                 count--;
                 if (count <= 0) {
                   if (!tappedIntoStop) {
@@ -805,14 +1015,16 @@ class _TransitAppState extends State<TransitApp> {
                     showZoomInIfNeeded();
                   }
                   if (tappedIntoStop && _tappedStop?.StopNo != null) {
-                    mapController?.showMarkerInfoWindow(
-                        MarkerId(_tappedStop!.StopNo.toString()));
+                    try {
+                      mapController?.showMarkerInfoWindow(
+                          MarkerId(_tappedStop!.StopNo.toString()));
+                    } catch (_) {}
                   }
                 }
               },
             ),
             AnimatedOpacity(
-              opacity: zoomBool ? 1.0 : 0.0,
+              opacity: zoomBool && !_showWaitTimes ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 681),
               child: Align(
                 alignment: Alignment.center,
@@ -831,8 +1043,12 @@ class _TransitAppState extends State<TransitApp> {
                 ),
               ),
             ),
+            if (!_mapReady && darkModeOn)
+              Positioned.fill(
+                child: ColoredBox(color: colorFromHex('1b2336')),
+              ),
             Visibility(
-              visible: !showingSpecificBuses,
+              visible: !showingSpecificBuses && !_showWaitTimes,
               child: Positioned(
                 top: 116,
                 right: 7,
@@ -882,7 +1098,7 @@ class _TransitAppState extends State<TransitApp> {
               ),
             ),
             Visibility(
-              visible: !showingSpecificBuses,
+              visible: !showingSpecificBuses && !_showWaitTimes,
               child: BusSheet(
                 nextBuses: nextBuses,
                 dotList: scrollSheetDotList,
@@ -903,7 +1119,7 @@ class _TransitAppState extends State<TransitApp> {
                   }
                 },
                 onCenterLocation: _currentLocation,
-                onTripTap: openWaitTimesPopup,
+                onTripTap: _openWaitTimes,
                 onDotChanged: (routeIndex, dot) {
                   setState(() {
                     scrollSheetDotList[routeIndex] = dot;
@@ -912,7 +1128,7 @@ class _TransitAppState extends State<TransitApp> {
               ),
             ),
             Visibility(
-              visible: !showingSpecificBuses,
+              visible: !showingSpecificBuses && !_showWaitTimes,
               child: StopSearchBar(
                 controller: _searchBarController,
                 hintText: 'Search for stops',
@@ -948,6 +1164,15 @@ class _TransitAppState extends State<TransitApp> {
                 },
               ),
             ),
+            if (_showWaitTimes)
+              WaitTimesSheet(
+                key: _waitTimesKey,
+                routeNo: _wtRouteNo,
+                loading: _wtLoading,
+                trips: _wtTrips,
+                isDarkMode: darkModeOn,
+                onDismiss: _clearWaitTimesState,
+              ),
             Visibility(
               visible: showingSpecificBuses,
               child: Positioned(

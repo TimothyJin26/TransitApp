@@ -34,8 +34,9 @@ class GtfsVehiclePosition {
   final double latitude;
   final double longitude;
   final double? bearing;
+  DateTime? lastSeen;
 
-  const GtfsVehiclePosition({
+  GtfsVehiclePosition({
     required this.vehicleId,
     required this.tripId,
     required this.routeId,
@@ -69,8 +70,11 @@ class GtfsRealtimeReader {
     while (r.hasMore) {
       final tag = r.varint();
       if (tag >> 3 == 2 && tag & 7 == 2) {
-        final vp = _vehiclePositionFromEntity(r.bytes());
-        if (vp != null) out.add(vp);
+        final entityBytes = r.bytes();
+        try {
+          final vp = _vehiclePositionFromEntity(entityBytes);
+          if (vp != null) out.add(vp);
+        } catch (_) {}
       } else {
         r.skip(tag & 7);
       }
@@ -300,8 +304,13 @@ class _R {
 
   Uint8List bytes() {
     final len = varint();
-    final b = Uint8List.fromList(_d.sublist(_p, _p + len));
-    _p += len;
+    final end = _p + len;
+    if (end > _d.length) {
+      _p = _d.length; // mark exhausted so the caller loop exits
+      return Uint8List(0);
+    }
+    final b = Uint8List.fromList(_d.sublist(_p, end));
+    _p = end;
     return b;
   }
 

@@ -52,10 +52,10 @@ class NextBusesForRouteAtStop {
         Pattern: GtfsUtil.directionFromStop(stop?.OnStreet, tu.directionId),
         Destination: GtfsUtil.stripHeadsignPrefix(tripInfo?.headsign ?? '').toUpperCase(),
         ExpectedCountdown: countdown,
-        LastUpdate: DateTime.now().toIso8601String(), // non-null = live
+        LastUpdate: DateTime.now().toIso8601String(),
         RouteNo: thisRouteNo,
         ExpectedLeaveTime: GtfsUtil.formatTime(departureTime),
-      ));
+      )..tripId = tu.tripId);
     }
 
     // Scheduled departures for trips not already in the realtime feed
@@ -78,10 +78,10 @@ class NextBusesForRouteAtStop {
         Pattern: GtfsUtil.directionFromStop(stop?.OnStreet, tripInfo.directionId),
         Destination: GtfsUtil.stripHeadsignPrefix(tripInfo.headsign).toUpperCase(),
         ExpectedCountdown: countdown,
-        LastUpdate: null, // null = scheduled only
+        LastUpdate: null,
         RouteNo: thisRouteNo,
         ExpectedLeaveTime: GtfsUtil.formatTime(epochSec),
-      ));
+      )..tripId = tripId);
     }
 
     trips.sort((a, b) => (a.ExpectedCountdown ?? 0).compareTo(b.ExpectedCountdown ?? 0));

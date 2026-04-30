@@ -4,6 +4,7 @@ part 'Trip.g.dart';
 
 @JsonSerializable()
 class Trip {
+  String? tripId;
   String? nextStop;
   String? Pattern;
   String? Destination;

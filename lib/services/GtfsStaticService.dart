@@ -11,13 +11,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:transitapp/models/Stop.dart';
 
 
-class _GtfsTrip {
+class GtfsTrip {
   final String routeId;
   final String headsign;
   final int directionId;
   final String serviceId;
   final String shapeId;
-  _GtfsTrip(this.routeId, this.headsign, this.directionId, this.serviceId, this.shapeId);
+  GtfsTrip(this.routeId, this.headsign, this.directionId, this.serviceId, this.shapeId);
 }
 
 class _ScheduledDep {
@@ -50,7 +50,7 @@ class GtfsStaticService {
   // shape_id → ordered LatLng points
   final Map<String, List<LatLng>> _shapes = {};
   // trip_id → trip info
-  final Map<String, _GtfsTrip> _trips = {};
+  final Map<String, GtfsTrip> _trips = {};
   // service_ids running today (from calendar.txt + calendar_dates.txt)
   final Set<String> _activeServiceIds = {};
   bool _calendarLoaded = false;
@@ -74,6 +74,20 @@ class GtfsStaticService {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   bool get hasRoutesLoaded => _routes.isNotEmpty;
+
+  /// Deletes the on-disk cache so the next [ensureLoaded] call re-downloads.
+  Future<void> invalidateCache() async {
+    try {
+      final cacheDir = await getApplicationCacheDirectory();
+      final zipFile = File('${cacheDir.path}/$_cacheFileName');
+      final tsFile = File('${cacheDir.path}/$_cacheTimestampFileName');
+      if (zipFile.existsSync()) await zipFile.delete();
+      if (tsFile.existsSync()) await tsFile.delete();
+    } catch (_) {}
+    _staticLoaded = false;
+    _stopsLoaded = false;
+    _loadFuture = null;
+  }
 
   /// Must be awaited before calling any other method.
   Future<void> ensureLoaded() {
@@ -161,7 +175,7 @@ class GtfsStaticService {
     return null;
   }
   String? getRouteShortName(String routeId) => _routes[routeId];
-  _GtfsTrip? getTripInfo(String tripId) => _trips[tripId];
+  GtfsTrip? getTripInfo(String tripId) => _trips[tripId];
 
   /// Returns the route color for [routeNo], defaulting to a blue toned to [isDark].
   Color getRouteColor(String routeNo, {bool isDark = false}) {
@@ -223,6 +237,34 @@ class GtfsStaticService {
     final result = <List<LatLng>>[];
     for (final trip in _trips.values) {
       if (trip.routeId != routeId) continue;
+      if (trip.shapeId.isEmpty || !seen.add(trip.shapeId)) continue;
+      final pts = _shapes[trip.shapeId];
+      if (pts != null && pts.isNotEmpty) result.add(pts);
+    }
+    return result;
+  }
+
+  /// Returns a representative trip ID for [routeNo] and [directionId], or null.
+  String? getRepresentativeTripId(String routeNo, {int? directionId}) {
+    final routeId = _routeShortToId[_stripZeros(routeNo)];
+    if (routeId == null) return null;
+    for (final entry in _trips.entries) {
+      if (entry.value.routeId != routeId) continue;
+      if (directionId != null && entry.value.directionId != directionId) continue;
+      return entry.key;
+    }
+    return null;
+  }
+
+  /// Returns shapes for [routeNo] filtered to [directionId] (0 or 1).
+  List<List<LatLng>> getShapesForRouteAndDirection(String routeNo, int directionId) {
+    final routeId = _routeShortToId[_stripZeros(routeNo)];
+    if (routeId == null) return [];
+    final seen = <String>{};
+    final result = <List<LatLng>>[];
+    for (final trip in _trips.values) {
+      if (trip.routeId != routeId) continue;
+      if (trip.directionId != directionId) continue;
       if (trip.shapeId.isEmpty || !seen.add(trip.shapeId)) continue;
       final pts = _shapes[trip.shapeId];
       if (pts != null && pts.isNotEmpty) result.add(pts);
@@ -427,7 +469,7 @@ class GtfsStaticService {
       final shapeId = shapeIdCol >= 0 && shapeIdCol < row.length
           ? row[shapeIdCol].trim()
           : '';
-      _trips[tripId] = _GtfsTrip(routeId, headsign, dirId, serviceId, shapeId);
+      _trips[tripId] = GtfsTrip(routeId, headsign, dirId, serviceId, shapeId);
     }
   }
 
