@@ -27,6 +27,7 @@ class GtfsRealtimeService {
   void invalidateCache() {
     _tripUpdatesAt = null;
     _tripUpdateIndex = null;
+    _vehiclePositionsAt = null;
   }
 
   Future<List<GtfsTripUpdate>> getTripUpdates() async {

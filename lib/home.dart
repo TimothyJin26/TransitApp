@@ -893,6 +893,7 @@ class _TransitAppState extends State<TransitApp> {
     _busIconImage ??= await load('images/bus-icon-outline.png');
 
     _wtAgeTimer?.cancel();
+    GtfsRealtimeService().invalidateCache();
     await _rebuildWtBusMarkers();
     _wtAgeTimer = Timer.periodic(const Duration(seconds: 1), (_) => _rebuildWtBusMarkers());
   }
@@ -1015,10 +1016,9 @@ class _TransitAppState extends State<TransitApp> {
                     showZoomInIfNeeded();
                   }
                   if (tappedIntoStop && _tappedStop?.StopNo != null) {
-                    try {
-                      mapController?.showMarkerInfoWindow(
-                          MarkerId(_tappedStop!.StopNo.toString()));
-                    } catch (_) {}
+                    mapController?.showMarkerInfoWindow(
+                        MarkerId(_tappedStop!.StopNo.toString()))
+                        .catchError((_) {});
                   }
                 }
               },

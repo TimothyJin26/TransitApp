@@ -49,15 +49,17 @@ class MarkerHelper {
       String? ageLabel, bool isDark = false}) async {
     final int pw = (width * pixelRatio).round();
     final int ph = (height * pixelRatio).round();
+    final double pillOverflowX = ageLabel != null ? 6 * pixelRatio : 0;
+    final int totalW = pw + pillOverflowX.round();
 
     final double pillLogH = 14 * pixelRatio;
     final double pillRadius = 7 * pixelRatio;
 
-    // Extra canvas height at top to accommodate the pill without clipping.
-    final double pillExtraH = ageLabel != null ? (pillLogH + 2 * pixelRatio) : 0;
+    final double pillOffsetY = ageLabel != null ? 1 * pixelRatio : 0;
+    final double pillExtraH = ageLabel != null ? (pillLogH * 0.5).ceilToDouble() : 0;
     final int totalH = ph + pillExtraH.round();
 
-    final double fontSize = (title.length >= 3 ? height * 0.27 : height * 0.35) * pixelRatio;
+    final double fontSize = (title.length >= 3 ? height * 0.33 : height * 0.42) * pixelRatio;
 
     final TextPainter tp = TextPainter(
       text: TextSpan(
@@ -127,8 +129,8 @@ class MarkerHelper {
       final dynamicPillW = totalContentW + padX * 2;
       final pillH = pillLogH;
 
-      final pillLeft = pw - dynamicPillW;
-      const pillTop = 0.0;
+      final pillLeft = (pw - dynamicPillW + 6 * pixelRatio).clamp(0.0, pw.toDouble());
+      final pillTop = pillOffsetY;
 
       c.drawRRect(
         RRect.fromRectAndRadius(
@@ -148,7 +150,7 @@ class MarkerHelper {
 
     final ui.Picture p = recorder.endRecording();
     final ByteData? pngBytes =
-        await (await p.toImage(pw, totalH)).toByteData(format: ui.ImageByteFormat.png);
+        await (await p.toImage(totalW, totalH)).toByteData(format: ui.ImageByteFormat.png);
 
     if (pngBytes == null) return BitmapDescriptor.defaultMarker;
     return BitmapDescriptor.bytes(Uint8List.view(pngBytes.buffer), imagePixelRatio: pixelRatio);
