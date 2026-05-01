@@ -107,6 +107,12 @@ class _TransitAppState extends State<TransitApp> {
   int _wtDirectionId = 0;
   Timer? _wtAgeTimer;
   ui.Image? _busIconImage;
+  LatLng? _overlayLatLng;
+  ScreenCoordinate? _overlayCoord;
+  String? _overlayTitle;
+  String? _overlaySubtitle;
+  DateTime? _overlayBusLastSeen;
+  Timer? _overlayTimer;
   bool isLocationOnMapEnabled = false;
   String? _currentMapStyle;
   final StopSearchBarController _searchBarController = StopSearchBarController();
@@ -307,6 +313,7 @@ class _TransitAppState extends State<TransitApp> {
     positionStream?.cancel();
     timer?.cancel();
     timerShort?.cancel();
+    _overlayTimer?.cancel();
     super.dispose();
   }
 
@@ -334,19 +341,20 @@ class _TransitAppState extends State<TransitApp> {
     for (int i = 0; i < buses.length; i++) {
       final Bus bus = buses[i];
       final marker = Marker(
-        onTap: () => _onBusMarkerTap(bus.RouteNo ?? '', bus.TripId?.toString()),
+        onTap: () async {
+          _onBusMarkerTap(bus.RouteNo ?? '', bus.TripId?.toString());
+          final dest = bus.Destination ?? '';
+          final toIdx = dest.toLowerCase().indexOf('/to ');
+          final cleanDest = toIdx != -1 ? dest.substring(toIdx + 4).trim() : dest;
+          final pos = LatLng((bus.Latitude ?? 0) - 0.00005, bus.Longitude ?? 0);
+          final positions = await GtfsRealtimeService().getVehiclePositions();
+          final match = positions.where((v) => v.tripId == bus.TripId?.toString()).firstOrNull;
+          await _showMarkerOverlay(position: pos, title: cleanDest.isNotEmpty ? cleanDest : null, lastSeen: match?.lastSeen);
+        },
         markerId: MarkerId(
             '${bus.VehicleNo?.isNotEmpty == true ? bus.VehicleNo : i}!${bus.RouteNo}!${bus.Pattern}'),
         position: LatLng(
             (bus.Latitude ?? 0) - 0.00005, bus.Longitude ?? 0),
-        infoWindow: InfoWindow(
-          title: () {
-            final dest = bus.Destination ?? '';
-            final toIdx = dest.toLowerCase().indexOf('/to ');
-            final clean = toIdx != -1 ? dest.substring(toIdx + 4).trim() : dest;
-            return clean.isNotEmpty ? clean : null;
-          }(),
-        ),
         icon: descriptors[i],
       );
       l.add(marker);
@@ -459,8 +467,8 @@ class _TransitAppState extends State<TransitApp> {
       for (final Stop stop in stops)
         MarkerHelper.createCustomMarkerBitmapNoText(
           image,
-          highlightedStopNo == stop.StopNo ? 60 : 38,
-          highlightedStopNo == stop.StopNo ? 60 : 38,
+          38,
+          38,
           pixelRatio: _pixelRatio,
         ),
     ];
@@ -471,13 +479,16 @@ class _TransitAppState extends State<TransitApp> {
     for (int i = 0; i < stops.length; i++) {
       final Stop stop = stops[i];
       final marker = Marker(
-        onTap: () => _onStopTapped(stop),
+        onTap: () {
+          _onStopTapped(stop);
+          _showMarkerOverlay(
+            position: LatLng(stop.Latitude ?? 0, stop.Longitude ?? 0),
+            title: stop.Name.toString(),
+            subtitle: stop.StopNo.toString(),
+          );
+        },
         markerId: MarkerId(stop.StopNo.toString()),
         position: LatLng(stop.Latitude ?? 0, stop.Longitude ?? 0),
-        infoWindow: InfoWindow(
-          title: stop.Name.toString(),
-          snippet: stop.StopNo.toString(),
-        ),
         icon: descriptors[i],
       );
       l.add(marker);
@@ -557,7 +568,12 @@ class _TransitAppState extends State<TransitApp> {
         markerId: MarkerId('stopview_${v.vehicleId}'),
         position: LatLng(v.latitude - 0.00005, v.longitude),
         icon: descriptors[i],
-        onTap: () => _onBusMarkerTap(routeNo, v.tripId),
+        onTap: () async {
+          _onBusMarkerTap(routeNo, v.tripId);
+          final dest = static_.getTripInfo(v.tripId)?.headsign ?? '';
+          final pos = LatLng(v.latitude - 0.00005, v.longitude);
+          await _showMarkerOverlay(position: pos, title: dest.isNotEmpty ? dest : null, lastSeen: v.lastSeen);
+        },
       ));
     }
     if (mounted) setState(() { _stopViewBusMarkers = markers; });
@@ -940,6 +956,99 @@ class _TransitAppState extends State<TransitApp> {
     }
   }
 
+  Future<void> _showMarkerOverlay({
+    required LatLng position,
+    String? title,
+    String? subtitle,
+    DateTime? lastSeen,
+  }) async {
+    _overlayTimer?.cancel();
+    _overlayTimer = null;
+    final coord = await mapController?.getScreenCoordinate(position);
+    if (!mounted) return;
+    setState(() {
+      _overlayLatLng = position;
+      _overlayCoord = coord;
+      _overlayTitle = title;
+      _overlaySubtitle = subtitle;
+      _overlayBusLastSeen = lastSeen;
+    });
+    if (lastSeen != null) {
+      _overlayTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  void _dismissMarkerOverlay() {
+    _overlayTimer?.cancel();
+    _overlayTimer = null;
+    setState(() {
+      _overlayLatLng = null;
+      _overlayCoord = null;
+      _overlayTitle = null;
+      _overlaySubtitle = null;
+      _overlayBusLastSeen = null;
+    });
+  }
+
+  void _repositionOverlay() {
+    if (_overlayLatLng == null) return;
+    mapController?.getScreenCoordinate(_overlayLatLng!).then((coord) {
+      if (mounted) setState(() => _overlayCoord = coord);
+    });
+  }
+
+  Widget _buildMarkerOverlay() {
+    if (_overlayCoord == null) return const SizedBox.shrink();
+    final bgColor = darkModeOn ? const Color.fromRGBO(50, 52, 58, 1) : Colors.white;
+    final textColor = darkModeOn ? Colors.white : Colors.black87;
+    final subColor = darkModeOn ? const Color.fromRGBO(142, 142, 147, 1) : Colors.grey.shade600;
+
+    String? sub = _overlaySubtitle;
+    if (_overlayBusLastSeen != null) {
+      final secs = DateTime.now().difference(_overlayBusLastSeen!).inSeconds;
+      sub = secs < 60 ? 'Last updated: ${secs}s' : 'Last updated: ${(secs / 60).floor()}m';
+    }
+
+    const arrowH = 6.0;
+    const estWidth = 150.0;
+    const estCardH = 46.0;
+
+    return Positioned(
+      left: _overlayCoord!.x.toDouble() - estWidth / 2,
+      top: _overlayCoord!.y.toDouble() - estCardH - arrowH,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            constraints: const BoxConstraints(maxWidth: estWidth),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2))],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_overlayTitle != null && _overlayTitle!.isNotEmpty)
+                  Text(_overlayTitle!, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 13)),
+                if (sub != null)
+                  Text(sub, style: TextStyle(color: subColor, fontSize: 11)),
+              ],
+            ),
+          ),
+          CustomPaint(
+            size: const Size(12, arrowH),
+            painter: _DownArrowPainter(bgColor),
+          ),
+        ],
+      ),
+    );
+  }
+
   ///
   /// Builds the UI
   ///
@@ -993,6 +1102,7 @@ class _TransitAppState extends State<TransitApp> {
                   .union(_stopViewBusMarkers)
                   .union(Set.from(_wtStopMarker == null ? [] : [_wtStopMarker])),
               onTap: (LatLng a) {
+                _dismissMarkerOverlay();
                 if (_showWaitTimes) {
                   _dismissWaitTimes();
                   return;
@@ -1014,6 +1124,7 @@ class _TransitAppState extends State<TransitApp> {
                   showZoomInIfNeeded();
                 }
               },
+              onCameraMove: (_) => _repositionOverlay(),
               onCameraIdle: () {
                 if (!_mapReady) setState(() => _mapReady = true);
                 count--;
@@ -1032,9 +1143,11 @@ class _TransitAppState extends State<TransitApp> {
                     showZoomInIfNeeded();
                   }
                   if (tappedIntoStop && _tappedStop?.StopNo != null) {
-                    mapController?.showMarkerInfoWindow(
-                        MarkerId(_tappedStop!.StopNo.toString()))
-                        .catchError((_) {});
+                    _showMarkerOverlay(
+                      position: LatLng(_tappedStop!.Latitude ?? 0, _tappedStop!.Longitude ?? 0),
+                      title: _tappedStop!.Name.toString(),
+                      subtitle: _tappedStop!.StopNo.toString(),
+                    );
                   }
                 }
               },
@@ -1225,6 +1338,7 @@ class _TransitAppState extends State<TransitApp> {
                 ),
               ),
             ),
+            _buildMarkerOverlay(),
           ]),
         ),
       ),
@@ -1277,14 +1391,20 @@ class _TransitAppState extends State<TransitApp> {
           }
         }
         if (stopName == null || latitude == null || longitude == null) return;
+        final double lat = latitude;
+        final double lng = longitude;
+        final String sName = stopName;
         final marker = Marker(
           markerId: MarkerId(stopNo),
-          position: LatLng(latitude, longitude),
-          infoWindow: InfoWindow(
-            title: stopName,
-            snippet: stopNo,
-          ),
+          position: LatLng(lat, lng),
           icon: bitmapDescriptor,
+          onTap: () {
+            _showMarkerOverlay(
+              position: LatLng(lat, lng),
+              title: sName,
+              subtitle: stopNo,
+            );
+          },
         );
         setState(() {
           selectedPattern = pattern;
@@ -1296,5 +1416,18 @@ class _TransitAppState extends State<TransitApp> {
   }
 }
 
-
-
+class _DownArrowPainter extends CustomPainter {
+  final Color color;
+  _DownArrowPainter(this.color);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width / 2, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+  @override
+  bool shouldRepaint(_DownArrowPainter old) => old.color != color;
+}
