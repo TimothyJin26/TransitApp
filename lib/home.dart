@@ -113,6 +113,7 @@ class _TransitAppState extends State<TransitApp> {
   String? _overlaySubtitle;
   DateTime? _overlayBusLastSeen;
   Timer? _overlayTimer;
+  double _overlayMarkerHeight = 80.0;
   bool isLocationOnMapEnabled = false;
   String? _currentMapStyle;
   final StopSearchBarController _searchBarController = StopSearchBarController();
@@ -464,7 +465,7 @@ class _TransitAppState extends State<TransitApp> {
     final ui.Image image = await load('images/StopIcon.png');
 
     final List<Future<BitmapDescriptor>> bitmapFutures = [
-      for (final Stop stop in stops)
+      for (final _ in stops)
         MarkerHelper.createCustomMarkerBitmapNoText(
           image,
           38,
@@ -961,6 +962,7 @@ class _TransitAppState extends State<TransitApp> {
     String? title,
     String? subtitle,
     DateTime? lastSeen,
+    double markerHeight = 80.0,
   }) async {
     _overlayTimer?.cancel();
     _overlayTimer = null;
@@ -1014,10 +1016,11 @@ class _TransitAppState extends State<TransitApp> {
     const arrowH = 6.0;
     const estWidth = 150.0;
     const estCardH = 46.0;
+    const markerH = 80.0;
 
     return Positioned(
       left: _overlayCoord!.x.toDouble() - estWidth / 2,
-      top: _overlayCoord!.y.toDouble() - estCardH - arrowH,
+      top: _overlayCoord!.y.toDouble() - markerH - estCardH - arrowH,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:transitapp/proto/GtfsRealtimeReader.dart';
 
@@ -38,7 +39,7 @@ class GtfsRealtimeService {
               'https://gtfsapi.translink.ca/v3/gtfsrealtime?apikey=$_apiKey'))
           .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
-        _tripUpdates = GtfsRealtimeReader.parseTripUpdates(resp.bodyBytes);
+        _tripUpdates = await compute(GtfsRealtimeReader.parseTripUpdates, resp.bodyBytes);
         _tripUpdatesAt = DateTime.now();
         _tripUpdateIndex = null;
       }
@@ -69,7 +70,7 @@ class GtfsRealtimeService {
               'https://gtfsapi.translink.ca/v3/gtfsposition?apikey=$_apiKey'))
           .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
-        final fresh = GtfsRealtimeReader.parseVehiclePositions(resp.bodyBytes);
+        final fresh = await compute(GtfsRealtimeReader.parseVehiclePositions, resp.bodyBytes);
         final now = DateTime.now();
 
         // Update last-known cache and stamp lastSeen on each fresh position.
