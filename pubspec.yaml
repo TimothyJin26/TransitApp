@@ -33,6 +33,7 @@ dependencies:
   auto_size_text: ^3.0.0
   flutter_native_splash: ^2.4.3
   shared_preferences: ^2.5.5
+  google_mobile_ads: ^8.0.0
 
 dev_dependencies:
   flutter_test:

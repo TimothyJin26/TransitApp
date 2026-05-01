@@ -5,6 +5,7 @@
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -36,6 +37,7 @@ import 'fetchers/StopFetcher.dart';
 import 'models/BothDirectionRouteWithTrips.dart';
 import 'models/Stop.dart';
 import 'models/Trip.dart';
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 ///
@@ -107,6 +109,8 @@ class _TransitAppState extends State<TransitApp> {
   int _wtDirectionId = 0;
   Timer? _wtAgeTimer;
   ui.Image? _busIconImage;
+  // BannerAd? _bannerAd;
+  // bool _bannerAdLoaded = false;
   bool isLocationOnMapEnabled = false;
   String? _currentMapStyle;
   final StopSearchBarController _searchBarController = StopSearchBarController();
@@ -174,6 +178,17 @@ class _TransitAppState extends State<TransitApp> {
   void initState() {
     super.initState();
     _loadSavedTab();
+    // _bannerAd = BannerAd(
+    //   adUnitId: Platform.isAndroid
+    //       ? 'ca-app-pub-6078575452513504/9492188580'
+    //       : 'ca-app-pub-6078575452513504/5469183098',
+    //   size: AdSize.banner,
+    //   request: const AdRequest(),
+    //   listener: BannerAdListener(
+    //     onAdLoaded: (_) => setState(() => _bannerAdLoaded = true),
+    //     onAdFailedToLoad: (ad, _) => ad.dispose(),
+    //   ),
+    // )..load();
     try {
       positionStream =
           Geolocator.getPositionStream().listen((Position position) {
@@ -307,6 +322,7 @@ class _TransitAppState extends State<TransitApp> {
     positionStream?.cancel();
     timer?.cancel();
     timerShort?.cancel();
+    // _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -1226,6 +1242,17 @@ class _TransitAppState extends State<TransitApp> {
                 ),
               ),
             ),
+            // if (_bannerAdLoaded && _bannerAd != null && MediaQuery.of(context).viewInsets.bottom == 0)
+            //   Positioned(
+            //     bottom: 0,
+            //     left: 0,
+            //     right: 0,
+            //     child: SizedBox(
+            //       width: _bannerAd!.size.width.toDouble(),
+            //       height: _bannerAd!.size.height.toDouble(),
+            //       child: AdWidget(ad: _bannerAd!),
+            //     ),
+            //   ),
           ]),
         ),
       ),
