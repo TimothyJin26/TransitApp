@@ -1172,6 +1172,7 @@ class _TransitAppState extends State<TransitApp> {
                       updateStops(
                           (post.Latitude ?? 0).toString(),
                           (post.Longitude ?? 0).toString());
+                      setState(() => zoomBool = false);
                       mapController?.animateCamera(
                           CameraUpdate.newCameraPosition(CameraPosition(
                               target: LatLng(post.Latitude ?? 0, post.Longitude ?? 0),
