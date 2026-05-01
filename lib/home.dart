@@ -36,6 +36,7 @@ import 'fetchers/StopFetcher.dart';
 import 'models/BothDirectionRouteWithTrips.dart';
 import 'models/Stop.dart';
 import 'models/Trip.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 ///
 /// Main stateful widget
@@ -155,9 +156,24 @@ class _TransitAppState extends State<TransitApp> {
     }
   }
 
+  Future<void> _loadSavedTab() async {
+    final prefs = await SharedPreferences.getInstance();
+    final onStops = prefs.getBool('tab_stops') ?? false;
+    if (onStops && mounted) {
+      setState(() => isSelected = [false, true]);
+      getLocationAndUpdateStops();
+    }
+  }
+
+  Future<void> _saveTab() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('tab_stops', isSelected[1]);
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadSavedTab();
     try {
       positionStream =
           Geolocator.getPositionStream().listen((Position position) {
@@ -1081,6 +1097,7 @@ class _TransitAppState extends State<TransitApp> {
                           tappedIntoStop = false;
                           _stopViewBusMarkers = {};
                         });
+                        _saveTab();
                       },
                       backgroundColor: darkModeOn
                           ? const Color.fromRGBO(50, 52, 58, 1)
