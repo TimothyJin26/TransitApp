@@ -42,7 +42,11 @@ class NextBusesForRouteAtStop {
       if (thisRouteNo != routeNo) continue;
       if (!matchesPattern(tu.directionId)) continue;
 
-      final departureTime = stu.time;
+      int? departureTime = stu.time;
+      if (departureTime == null && stu.delay != null) {
+        final scheduled = static_.getScheduledEpoch(tu.tripId, stu.stopId);
+        if (scheduled != null) departureTime = scheduled + stu.delay!;
+      }
       if (departureTime == null) continue;
       final countdown = ((departureTime - nowSec) / 60).floor();
       if (countdown < 0) continue;
@@ -71,16 +75,21 @@ class NextBusesForRouteAtStop {
       if (thisRouteNo != routeNo) continue;
       if (!matchesPattern(tripInfo.directionId)) continue;
 
-      final countdown = ((epochSec - nowSec) / 60).floor();
+      final (:cancelled, :delay) = await GtfsRealtimeService().getTripStatus(tripId);
+      if (cancelled) continue;
+      final rtDelay = delay;
+      final actualEpoch = rtDelay != null ? epochSec + rtDelay : epochSec;
+
+      final countdown = ((actualEpoch - nowSec) / 60).floor();
       if (countdown < 0) continue;
 
       trips.add(Trip(
         Pattern: GtfsUtil.directionFromStop(stop?.OnStreet, tripInfo.directionId),
         Destination: GtfsUtil.stripHeadsignPrefix(tripInfo.headsign).toUpperCase(),
         ExpectedCountdown: countdown,
-        LastUpdate: null,
+        LastUpdate: rtDelay != null ? DateTime.now().toIso8601String() : null,
         RouteNo: thisRouteNo,
-        ExpectedLeaveTime: GtfsUtil.formatTime(epochSec),
+        ExpectedLeaveTime: GtfsUtil.formatTime(actualEpoch),
       )..tripId = tripId);
     }
 

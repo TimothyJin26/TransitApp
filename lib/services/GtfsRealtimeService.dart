@@ -24,10 +24,15 @@ class GtfsRealtimeService {
 
   // Index: stop_id → list of (tripUpdate, stopTimeUpdate) for fast lookup
   Map<String, List<StopEntry>>? _tripUpdateIndex;
+  // trip_id → best delay estimate in seconds (from whichever stop the feed provided)
+  Map<String, int>? _tripDelayMap;
+  Set<String>? _cancelledTripIds;
 
   void invalidateCache() {
     _tripUpdatesAt = null;
     _tripUpdateIndex = null;
+    _tripDelayMap = null;
+    _cancelledTripIds = null;
     _vehiclePositionsAt = null;
   }
 
@@ -50,14 +55,20 @@ class GtfsRealtimeService {
   /// Returns all upcoming departures for [stopId], sorted by time.
   Future<List<StopEntry>> getDeparturesForStop(String stopId) async {
     final updates = await getTripUpdates();
-    _tripUpdateIndex ??= _buildIndex(updates);
+    _ensureIndexes(updates);
     return _tripUpdateIndex![stopId] ?? [];
   }
 
-  /// Returns trip IDs of all trips currently departing from [stopId].
-  Future<Set<String>> getTripIdsForStop(String stopId) async {
-    final entries = await getDeparturesForStop(stopId);
-    return entries.map((e) => e.tripUpdate.tripId).toSet();
+  /// Returns `(cancelled, delay)` for [tripId] from the RT feed.
+  /// `cancelled` is true if the trip is marked CANCELED.
+  /// `delay` is the delay in seconds if the trip is live, or null if not in the feed.
+  Future<({bool cancelled, int? delay})> getTripStatus(String tripId) async {
+    final updates = await getTripUpdates();
+    _ensureIndexes(updates);
+    return (
+      cancelled: _cancelledTripIds!.contains(tripId),
+      delay: _tripDelayMap![tripId],
+    );
   }
 
   Future<List<GtfsVehiclePosition>> getVehiclePositions() async {
@@ -103,15 +114,26 @@ class GtfsRealtimeService {
       ts != null &&
       DateTime.now().difference(ts).inSeconds < _cacheSeconds;
 
-  static Map<String, List<StopEntry>> _buildIndex(
-      List<GtfsTripUpdate> updates) {
+  void _ensureIndexes(List<GtfsTripUpdate> updates) {
+    if (_tripUpdateIndex != null) return;
     final index = <String, List<StopEntry>>{};
+    final delays = <String, int>{};
+    final cancelled = <String>{};
     for (final tu in updates) {
+      if (tu.cancelled) {
+        cancelled.add(tu.tripId);
+        continue;
+      }
       for (final stu in tu.stopTimeUpdates) {
         index.putIfAbsent(stu.stopId, () => []).add(StopEntry(tu, stu));
       }
+      if (tu.stopTimeUpdates.isNotEmpty) {
+        delays[tu.tripId] = tu.stopTimeUpdates.first.delay ?? 0;
+      }
     }
-    return index;
+    _tripUpdateIndex = index;
+    _tripDelayMap = delays;
+    _cancelledTripIds = cancelled;
   }
 }
 

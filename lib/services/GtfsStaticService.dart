@@ -53,6 +53,8 @@ class GtfsStaticService {
   final Map<String, GtfsTrip> _trips = {};
   // service_ids running today (from calendar.txt + calendar_dates.txt)
   final Set<String> _activeServiceIds = {};
+  // service_ids from yesterday only — used to admit overnight GTFS trips (departure_time >= 24:00)
+  final Set<String> _yesterdayServiceIds = {};
   bool _calendarLoaded = false;
   // stop_id → scheduled departures for today's active trips
   final Map<String, List<_ScheduledDep>> _stopTimes = {};
@@ -166,6 +168,21 @@ class GtfsStaticService {
     return out;
   }
 
+  /// Returns the scheduled Unix epoch seconds for [tripId] at [stopId], or null.
+  int? getScheduledEpoch(String tripId, String stopId) {
+    final dep = _stopTimes[stopId]?.firstWhere(
+      (d) => d.tripId == tripId,
+      orElse: () => _ScheduledDep('', -1),
+    );
+    if (dep == null || dep.departureSec < 0) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final midnight = dep.departureSec >= 86400
+        ? today.subtract(const Duration(days: 1)).millisecondsSinceEpoch ~/ 1000
+        : today.millisecondsSinceEpoch ~/ 1000;
+    return midnight + dep.departureSec;
+  }
+
   String? getStopId(int stopCode) => _stopCodeToId[stopCode];
   int? getStopCode(String stopId) => _stopIdToCode[stopId];
   Stop? getStopByCode(int stopCode) {
@@ -190,13 +207,6 @@ class GtfsStaticService {
       }
     }
     return isDark ? const Color.fromARGB(255, 40, 92, 176) : const Color(0xFF1b2336);
-  }
-
-  /// Returns all trip IDs whose scheduled route serves [stopId] today.
-  Set<String> getTripIdsServingStop(String stopId) {
-    final deps = _stopTimes[stopId];
-    if (deps == null) return {};
-    return deps.map((d) => d.tripId).toSet();
   }
 
   /// Returns all route IDs (GTFS internal) for routes that serve [stopId] today.
@@ -285,15 +295,21 @@ class GtfsStaticService {
     if (deps == null || deps.isEmpty) return [];
 
     final now = DateTime.now();
-    final midnight = DateTime(now.year, now.month, now.day);
-    final midnightEpoch = midnight.millisecondsSinceEpoch ~/ 1000;
-    final nowSec = now.hour * 3600 + now.minute * 60 + now.second;
-    final windowStart = nowSec - 120; // exclude trips departed >2 min ago
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final todayMidnight = today.millisecondsSinceEpoch ~/ 1000;
+    final yesterdayMidnight = yesterday.millisecondsSinceEpoch ~/ 1000;
+    final nowEpoch = now.millisecondsSinceEpoch ~/ 1000;
 
     final result = <(String, int)>[];
     for (final d in deps) {
-      if (d.departureSec < windowStart) continue;
-      result.add((d.tripId, midnightEpoch + d.departureSec));
+      // GTFS overnight trips use departure_time >= 24:00:00 and belong to the
+      // previous service day, so base their epoch off yesterday's midnight.
+      final epochSec = d.departureSec >= 86400
+          ? yesterdayMidnight + d.departureSec
+          : todayMidnight + d.departureSec;
+      if (epochSec < nowEpoch - 120) continue;
+      result.add((d.tripId, epochSec));
     }
     result.sort((a, b) => a.$2.compareTo(b.$2));
     return result;
@@ -509,32 +525,45 @@ class GtfsStaticService {
 
   void _parseCalendar(String csv) {
     final now = DateTime.now();
-    final todayStr = '${now.year}'
-        '${now.month.toString().padLeft(2, '0')}'
-        '${now.day.toString().padLeft(2, '0')}';
+    final yesterday = now.subtract(const Duration(days: 1));
+    final todayStr = _dateStr(now);
+    final yesterdayStr = _dateStr(yesterday);
     const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     final dayName = dayNames[now.weekday - 1];
+    final yesterdayName = dayNames[yesterday.weekday - 1];
 
     final lines = csv.split('\n');
     if (lines.isEmpty) return;
     final header = _csvRow(lines[0]);
     final svcCol = header.indexOf('service_id');
-    final dayCol = header.indexOf(dayName);
     final startCol = header.indexOf('start_date');
     final endCol = header.indexOf('end_date');
-    if (svcCol < 0 || dayCol < 0) return;
+    if (svcCol < 0) return;
+
+    final todayDayCol = header.indexOf(dayName);
+    final yestDayCol = header.indexOf(yesterdayName);
 
     for (int i = 1; i < lines.length; i++) {
       final row = _csvRow(lines[i]);
-      if (row.length <= max(svcCol, dayCol)) continue;
-      if (row[dayCol].trim() != '1') continue;
+      if (row.length <= svcCol) continue;
       final svcId = row[svcCol].trim();
       if (svcId.isEmpty) continue;
       final start = startCol >= 0 && startCol < row.length ? row[startCol].trim() : '';
       final end = endCol >= 0 && endCol < row.length ? row[endCol].trim() : '';
-      if ((start.isEmpty || todayStr.compareTo(start) >= 0) &&
-          (end.isEmpty || todayStr.compareTo(end) <= 0)) {
-        _activeServiceIds.add(svcId);
+
+      if (todayDayCol >= 0 && todayDayCol < row.length && row[todayDayCol].trim() == '1') {
+        if ((start.isEmpty || todayStr.compareTo(start) >= 0) &&
+            (end.isEmpty || todayStr.compareTo(end) <= 0)) {
+          _activeServiceIds.add(svcId);
+        }
+      }
+      // Track yesterday's service separately — only overnight trips (departureSec >= 86400)
+      // from these IDs will be admitted in _parseStopTimes.
+      if (yestDayCol >= 0 && yestDayCol < row.length && row[yestDayCol].trim() == '1') {
+        if ((start.isEmpty || yesterdayStr.compareTo(start) >= 0) &&
+            (end.isEmpty || yesterdayStr.compareTo(end) <= 0)) {
+          _yesterdayServiceIds.add(svcId);
+        }
       }
     }
     _calendarLoaded = true;
@@ -542,9 +571,9 @@ class GtfsStaticService {
 
   void _parseCalendarDates(String csv) {
     final now = DateTime.now();
-    final todayStr = '${now.year}'
-        '${now.month.toString().padLeft(2, '0')}'
-        '${now.day.toString().padLeft(2, '0')}';
+    final yesterday = now.subtract(const Duration(days: 1));
+    final todayStr = _dateStr(now);
+    final yesterdayStr = _dateStr(yesterday);
 
     final lines = csv.split('\n');
     if (lines.isEmpty) return;
@@ -557,14 +586,15 @@ class GtfsStaticService {
     for (int i = 1; i < lines.length; i++) {
       final row = _csvRow(lines[i]);
       if (row.length <= max(svcCol, max(dateCol, exCol))) continue;
-      if (row[dateCol].trim() != todayStr) continue;
+      final rowDate = row[dateCol].trim();
       final svcId = row[svcCol].trim();
       final ex = int.tryParse(row[exCol].trim());
-      if (ex == 1) {
-        _activeServiceIds.add(svcId);
-        _calendarLoaded = true;
-      } else if (ex == 2) {
-        _activeServiceIds.remove(svcId);
+      if (rowDate == todayStr) {
+        if (ex == 1) { _activeServiceIds.add(svcId); _calendarLoaded = true; }
+        else if (ex == 2) _activeServiceIds.remove(svcId);
+      } else if (rowDate == yesterdayStr) {
+        if (ex == 1) _yesterdayServiceIds.add(svcId);
+        else if (ex == 2) _yesterdayServiceIds.remove(svcId);
       }
     }
   }
@@ -595,20 +625,27 @@ class GtfsStaticService {
       final tripId = row[tripIdCol].trim();
       if (tripId.isEmpty) continue;
 
-      // Filter to active trips only when calendar data is available
-      if (_calendarLoaded) {
-        final trip = _trips[tripId];
-        if (trip == null || !_activeServiceIds.contains(trip.serviceId)) continue;
-      } else {
-        if (!_trips.containsKey(tripId)) continue;
-      }
-
       final stopId = row[stopIdCol].trim();
       if (stopId.isEmpty) continue;
 
       final depStr = row[depCol].trim();
-      if (depStr.isNotEmpty) {
-        final depSec = _parseTimeSec(depStr);
+      final depSec = depStr.isNotEmpty ? _parseTimeSec(depStr) : -1;
+
+      // Filter to active trips only when calendar data is available
+      if (_calendarLoaded) {
+        final trip = _trips[tripId];
+        if (trip == null) continue;
+        final isToday = _activeServiceIds.contains(trip.serviceId);
+        final isYesterday = !isToday && _yesterdayServiceIds.contains(trip.serviceId);
+        if (!isToday && !isYesterday) continue;
+        if (depSec >= 0) {
+          // Only admit yesterday-service trips if they're overnight (>= 24:00).
+          if (!isYesterday || depSec >= 86400) {
+            _stopTimes.putIfAbsent(stopId, () => []).add(_ScheduledDep(tripId, depSec));
+          }
+        }
+      } else {
+        if (!_trips.containsKey(tripId)) continue;
         if (depSec >= 0) {
           _stopTimes.putIfAbsent(stopId, () => []).add(_ScheduledDep(tripId, depSec));
         }
@@ -625,6 +662,9 @@ class GtfsStaticService {
       _tripStops[entry.key] = entry.value.map((e) => e.$2).toList();
     }
   }
+
+  static String _dateStr(DateTime dt) =>
+      '${dt.year}${dt.month.toString().padLeft(2, '0')}${dt.day.toString().padLeft(2, '0')}';
 
   static int _parseTimeSec(String hms) {
     final parts = hms.split(':');

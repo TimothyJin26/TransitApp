@@ -8,12 +8,14 @@ class GtfsTripUpdate {
   final String tripId;
   final String routeId;
   final int directionId;
+  final bool cancelled;
   final List<GtfsStopTimeUpdate> stopTimeUpdates;
 
   const GtfsTripUpdate({
     required this.tripId,
     required this.routeId,
     required this.directionId,
+    required this.cancelled,
     required this.stopTimeUpdates,
   });
 }
@@ -21,10 +23,13 @@ class GtfsTripUpdate {
 class GtfsStopTimeUpdate {
   final String stopId;
 
-  /// Unix epoch seconds for expected departure (falls back to arrival).
+  /// Unix epoch seconds for expected departure (falls back to arrival). Null when only delay is provided.
   final int? time;
 
-  const GtfsStopTimeUpdate({required this.stopId, required this.time});
+  /// Seconds of delay relative to the scheduled time. Null if not provided.
+  final int? delay;
+
+  const GtfsStopTimeUpdate({required this.stopId, required this.time, required this.delay});
 }
 
 class GtfsVehiclePosition {
@@ -102,6 +107,7 @@ class GtfsRealtimeReader {
     final r = _R(bytes);
     String tripId = '', routeId = '';
     int dirId = 0;
+    bool cancelled = false;
     final stus = <GtfsStopTimeUpdate>[];
     while (r.hasMore) {
       final tag = r.varint();
@@ -112,6 +118,7 @@ class GtfsRealtimeReader {
         tripId = td.tripId;
         routeId = td.routeId;
         dirId = td.dirId;
+        cancelled = td.cancelled;
       } else if (field == 2 && wire == 2) {
         final stu = _parseStopTimeUpdate(r.bytes());
         if (stu != null) stus.add(stu);
@@ -124,20 +131,24 @@ class GtfsRealtimeReader {
         tripId: tripId,
         routeId: routeId,
         directionId: dirId,
+        cancelled: cancelled,
         stopTimeUpdates: stus);
   }
 
-  static ({String tripId, String routeId, int dirId}) _parseTripDescriptor(
+  static ({String tripId, String routeId, int dirId, bool cancelled}) _parseTripDescriptor(
       Uint8List bytes) {
     final r = _R(bytes);
     String tripId = '', routeId = '';
     int dirId = 0;
+    bool cancelled = false;
     while (r.hasMore) {
       final tag = r.varint();
       final field = tag >> 3;
       final wire = tag & 7;
       if (field == 1 && wire == 2) {
         tripId = r.string();
+      } else if (field == 4 && wire == 0) {
+        cancelled = r.varint() == 3; // 3 = CANCELED
       } else if (field == 5 && wire == 2) {
         routeId = r.string();
       } else if (field == 6 && wire == 0) {
@@ -146,13 +157,13 @@ class GtfsRealtimeReader {
         r.skip(wire);
       }
     }
-    return (tripId: tripId, routeId: routeId, dirId: dirId);
+    return (tripId: tripId, routeId: routeId, dirId: dirId, cancelled: cancelled);
   }
 
   static GtfsStopTimeUpdate? _parseStopTimeUpdate(Uint8List bytes) {
     final r = _R(bytes);
     String stopId = '';
-    int? departure, arrival;
+    ({int? time, int? delay})? departure, arrival;
     while (r.hasMore) {
       final tag = r.varint();
       final field = tag >> 3;
@@ -168,21 +179,29 @@ class GtfsRealtimeReader {
       }
     }
     if (stopId.isEmpty) return null;
-    return GtfsStopTimeUpdate(stopId: stopId, time: departure ?? arrival);
+    final event = departure ?? arrival;
+    return GtfsStopTimeUpdate(stopId: stopId, time: event?.time, delay: event?.delay);
   }
 
-  static int? _parseStopTimeEvent(Uint8List bytes) {
+  static ({int? time, int? delay}) _parseStopTimeEvent(Uint8List bytes) {
     final r = _R(bytes);
-    int? time;
+    int? time, delay;
     while (r.hasMore) {
       final tag = r.varint();
-      if (tag >> 3 == 2 && tag & 7 == 0) {
+      final field = tag >> 3;
+      final wire = tag & 7;
+      if (field == 1 && wire == 0) {
+        final raw = r.varint();
+        // int32 varint: take lower 32 bits and sign-extend
+        final low32 = raw & 0xFFFFFFFF;
+        delay = low32 > 0x7FFFFFFF ? low32 - 0x100000000 : low32;
+      } else if (field == 2 && wire == 0) {
         time = r.varint();
       } else {
-        r.skip(tag & 7);
+        r.skip(wire);
       }
     }
-    return time;
+    return (time: time, delay: delay);
   }
 
   // ── Vehicle position parsing ───────────────────────────────────────────────

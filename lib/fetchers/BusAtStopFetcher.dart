@@ -49,7 +49,11 @@ class BusAtStopFetcher {
         final tu = entry.tripUpdate;
         final stu = entry.stopTimeUpdate;
 
-        final departureTime = stu.time;
+        int? departureTime = stu.time;
+        if (departureTime == null && stu.delay != null) {
+          final scheduled = static_.getScheduledEpoch(tu.tripId, stu.stopId);
+          if (scheduled != null) departureTime = scheduled + stu.delay!;
+        }
         if (departureTime == null) continue;
         final countdown = ((departureTime - nowSec) / 60).floor();
         if (countdown < 0 || countdown > 90) continue;
@@ -88,9 +92,6 @@ class BusAtStopFetcher {
       for (final (tripId, epochSec) in scheduled) {
         if (realtimeTripIds.contains(tripId)) continue;
 
-        final countdown = ((epochSec - nowSec) / 60).floor();
-        if (countdown < 0 || countdown > 90) continue;
-
         final tripInfo = static_.getTripInfo(tripId);
         if (tripInfo == null) continue;
 
@@ -101,13 +102,21 @@ class BusAtStopFetcher {
         final key = '$routeNo|${tripInfo.directionId}';
         if (addedRouteDirections.contains(key)) continue;
 
+        final (:cancelled, :delay) = await rt.getTripStatus(tripId);
+        if (cancelled) continue;
+        final rtDelay = delay;
+        final actualEpoch = rtDelay != null ? epochSec + rtDelay : epochSec;
+
+        final countdown = ((actualEpoch - nowSec) / 60).floor();
+        if (countdown < 0 || countdown > 90) continue;
+
         final trip = Trip(
           Pattern: GtfsUtil.directionFromStop(stop.OnStreet, tripInfo.directionId),
           Destination: GtfsUtil.stripHeadsignPrefix(tripInfo.headsign).toUpperCase(),
           ExpectedCountdown: countdown,
-          LastUpdate: DateTime.now().toIso8601String(),
+          LastUpdate: rtDelay != null ? DateTime.now().toIso8601String() : null,
           RouteNo: routeNo,
-          ExpectedLeaveTime: GtfsUtil.formatTime(epochSec),
+          ExpectedLeaveTime: GtfsUtil.formatTime(actualEpoch),
         );
         trip.nextStop = GtfsUtil.nextStopLabel(
           name: stop.Name,

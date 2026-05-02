@@ -100,6 +100,8 @@ class _TransitAppState extends State<TransitApp> {
   bool _mapReady = false;
   bool _showWaitTimes = false;
   String _wtRouteNo = '';
+  String _wtStopNo = '';
+  String _wtPattern = '';
   List<Trip> _wtTrips = [];
   bool _wtLoading = false;
   Marker? _wtStopMarker;
@@ -312,6 +314,9 @@ class _TransitAppState extends State<TransitApp> {
     timeLastUpdated = DateTime.now();
     if (isSelected[0] == true) {
       updateBuses();
+    }
+    if (_showWaitTimes) {
+      _refreshWaitTimes();
     }
   }
 
@@ -739,6 +744,8 @@ class _TransitAppState extends State<TransitApp> {
     setState(() {
       _showWaitTimes = true;
       _wtRouteNo = cleanRoute;
+      _wtStopNo = stopNo;
+      _wtPattern = cleanPattern;
       _wtLoading = true;
       _wtTrips = [];
     });
@@ -754,6 +761,14 @@ class _TransitAppState extends State<TransitApp> {
       tripId: trips.isNotEmpty ? trips.first.tripId : null,
     );
     _buildWtStopMarker(stopNo);
+  }
+
+  Future<void> _refreshWaitTimes() async {
+    if (!_showWaitTimes || _wtStopNo.isEmpty || _wtLoading) return;
+    final trips = await NextBusesForRouteAtStop()
+        .busAtSingleStopFetcher(_wtStopNo, _wtRouteNo, _wtPattern);
+    if (!mounted || !_showWaitTimes) return;
+    setState(() { _wtTrips = trips; });
   }
 
   Future<void> _buildWtStopMarker(String stopNo) async {
